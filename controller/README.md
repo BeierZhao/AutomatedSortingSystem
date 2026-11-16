@@ -1,0 +1,112 @@
+# controller: ESP32-S3 arm firmware
+
+One PlatformIO project for both projects described in
+[docs/development_guide.md](../docs/development_guide.md).
+
+| Environment | What it builds |
+| --- | --- |
+| `arm4dof` | 4-DOF arm: shared arm controller, ultrasonic obstacle stop, buzzer, joystick manual mode |
+| `sorting` | Automated Sorting System. **Stub**: only the shared arm controller so far |
+| `native` | PC unit tests for the kinematics and the joint interpolator |
+
+## Build and test
+
+```
+pio run -e arm4dof
+pio run -e sorting
+pio test -e native
+```
+
+`pio test -e native` needs a host `g++` on the PATH. On Windows without one, PlatformIO's own package works:
+
+```
+pio pkg install -g -t platformio/toolchain-gccmingw32
+```
+
+then add `%USERPROFILE%\.platformio\packages\toolchain-gccmingw32\bin` to the PATH.
+
+## Configuration
+
+| What | Where |
+| --- | --- |
+| Wi-Fi name and password, gateway address | At run time with the serial panel (below), stored in the ESP32's flash. `include/NetConfig.h` holds the defaults used until something is stored |
+| Static IP, HTTP port, and the defaults above | `include/NetConfig.h`. Copy it from `include/NetConfig.example.h`. It is git-ignored |
+| Pins | `include/BoardPins.h` |
+| Link lengths, joint limits, servo mapping, speeds, home pose | `lib/ArmKinematics/ArmConfig.h` |
+| Tool TCP offsets | `lib/ToolHead/ToolHead.h` |
+| Obstacle thresholds, buzzer, joystick | `src/arm4dof/Arm4dofConfig.h` |
+
+Not measured yet, still at the proposed defaults: wrist servo direction, offset and limits, tool offsets, obstacle thresholds, joint speeds.
+
+## Status
+
+Everything below has been verified **by build and PC unit tests only**. Nothing has run on an ESP32-S3 or on the arm yet.
+
+| Part | State |
+| --- | --- |
+| FK, IK, limits, interpolation (`ArmKinematics`) | Done, 31 unit tests |
+| Servo output, 50 Hz motion task, stop (`ArmDriver`) | Written, builds |
+| Permit, status, manual mode, result rules (`ArmMachine`) | Written, builds |
+| Serial console compatible with the ArmTest 3D GUI | Written, builds |
+| Wi-Fi and `/controller/...` endpoints 4.2, 4.3, 4.5, 4.6, 4.7 | Written, builds |
+| `/scada/report-current-status`, `/scada/report-alarm` queue | Written, builds |
+| arm4dof: obstacle monitor, buzzer, joystick, endpoint 4.8 | Written, builds |
+| sorting: gripper, conveyor (4.4), vision client, position config (4.1), sequence, result report (2.3) | Not started |
+
+## Serial console
+
+115200 baud. The texts the ArmTest GUI parses (`[Nano OK]`, `[Nano IK FAIL]`, `#OK:b,s,e`, the `STATUS` block) are unchanged.
+
+`XYZ x y z`, `G x y z`, `HOME`, `STATUS`, `BOUNDS`, `STOP`, `PERMIT 0|1`, `STEP n`, `B|S|E|W <servo angle>`, `B+ B- S+ S- E+ E- W+ W-`, `HELP`.
+
+Differences from ArmTest: motion is interpolated, so `STATUS` shows the commanded target. `INVBASE`, `PIN`, `TEST` and `RAW` are gone (these are compile-time settings now).
+
+## Serial panel
+
+`tools/serial_hmi/` is a small browser panel (Chrome or Edge, Web Serial) based on the ArmTest GUI, without the 3D view. It shows the machine status, permit, TCP position, joint angles, obstacle distance and Wi-Fi state, offers permit, home, stop, XYZ and joint jog, and stores the Wi-Fi and gateway settings on the board.
+
+```
+python tools/serial_hmi/run_hmi.py          (or double-click run_hmi.bat)
+python tools/serial_hmi/run_hmi.py --demo   simulated data, no board needed
+```
+
+Plug the board in through its UART USB port and close any other serial monitor first. The panel uses these extra console commands (`src/common/HmiCommands.cpp`):
+
+| Command | Effect |
+| --- | --- |
+| `INFO` | One line `#INFO:{json}` with the live state. The panel polls it twice a second |
+| `J <joint> <angle>` | Jog joint 1 to 4 to a physical angle |
+| `SET SSID\|PASS\|GWHOST\|GWPORT <value>` | Store a network setting. The value is the rest of the line |
+| `FACTORY` | Forget the stored settings, back to `NetConfig.h` |
+| `REBOOT` | Restart, which applies stored settings |
+
+The Wi-Fi password is stored in the ESP32's flash unencrypted and is never printed back.
+
+## Assumptions made where the specification and the guide are silent
+
+Raise these for team review.
+
+1. A command that is both blocked (machine in `stop` or `manual`, or another command running) and invalid is answered `"rejected"`: the machine state is checked first.
+2. A `joint_number` outside 1 to 4 is answered `"invalid"`.
+3. Malformed JSON, or a missing or wrongly typed field, is answered with HTTP 400 and `{"error": "..."}`. An unknown path gives 404. An empty body counts as `{}`.
+4. If the HTTP client disconnects during a motion, the motion carries on and its result is dropped. Until it ends, other motion commands are `"rejected"`.
+5. While the obstacle alarm is active, `set-arm-position` and `set-joint-position` for joints 1 to 3 are `"rejected"` even after a new running permit. Joint 4 (wrist) is still accepted, so the sensor can be turned away to clear the alarm. This mirrors the manual-mode rule.
+6. On an obstacle stop, `report-current-status` with `"stop"` is sent even if the machine was already in `"stop"`.
+7. Wrist during an XYZ move: the wrist turns to `heading - yaw`, clamped to its limits, and joints 1 to 3 wait until it is within 10 degrees. A purely vertical move leaves the wrist alone. In manual mode the TCP likewise waits until the wrist is within 15 degrees of the stick direction.
+8. Serial jog commands do not need the running permit (commissioning without the gateway). They are refused in manual mode, while an HTTP motion command is running, and for joints 1 to 3 while the obstacle alarm is active.
+9. XYZ moves are interpolated in joint space, so the TCP path between two points is not a straight line.
+10. Positions and angles are returned rounded to 0.1.
+11. The servo pulse range is 544 to 2400 microseconds for 0 to 180 degrees, the Arduino Nano `Servo` default that the ArmTest calibration was done with.
+12. The buzzer is an active buzzer that sounds while its pin is high.
+13. The obstacle distance is the median of five readings at 20 Hz, so the alarm reacts after about 150 ms.
+14. The joystick centre is read at power-up, so the stick must be released then.
+
+## Trying it without the gateway
+
+```
+curl -X POST http://<esp32-ip>/controller/set-running-permit -H "Content-Type: application/json" -d "{\"permit\":true}"
+curl -X POST http://<esp32-ip>/controller/set-arm-position -H "Content-Type: application/json" -d "{\"x\":180,\"y\":40,\"z\":50}"
+curl -X POST http://<esp32-ip>/controller/get-current-joint-position -d "{}"
+```
+
+The `/scada/...` reports go to `NET_SCADA_HOST:NET_SCADA_PORT`. Until the gateway exists, any small HTTP server that prints POST bodies will do.

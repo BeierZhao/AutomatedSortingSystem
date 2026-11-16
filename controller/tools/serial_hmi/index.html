@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arm Controller Serial Panel</title>
+    <style>
+        /* Colours and component styles follow the ArmTest 3D GUI. */
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #131b2e;
+            --bg-panel: #1a233a;
+            --bg-hover: #222f4c;
+            --border-color: #2a3756;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-cyan: #0ea5e9;
+            --accent-cyan-glow: rgba(14, 165, 233, 0.35);
+            --accent-amber: #f59e0b;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand-icon {
+            width: 28px; height: 28px; border-radius: 6px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 14px; color: #fff;
+            box-shadow: 0 0 12px var(--accent-cyan-glow);
+        }
+        .brand-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+        .brand-sub { font-size: 12px; color: var(--text-muted); margin-left: 6px; }
+        .header-controls { display: flex; align-items: center; gap: 10px; }
+
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; text-transform: none; letter-spacing: 0; }
+        .badge-secondary { background-color: #334155; color: #cbd5e1; }
+        .badge-success { background-color: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .badge-warning { background-color: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+        .badge-danger { background-color: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .badge-info { background-color: rgba(14, 165, 233, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+
+        select, input, button { font-family: inherit; }
+        .btn {
+            padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+            border: 1px solid transparent; cursor: pointer; color: #fff; white-space: nowrap;
+        }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-primary { background-color: var(--accent-cyan); }
+        .btn-secondary { background-color: var(--bg-panel); border-color: var(--border-color); color: var(--text-primary); }
+        .btn-success { background-color: var(--accent-green); }
+        .btn-danger { background-color: var(--accent-red); }
+        .btn:not(:disabled):hover { filter: brightness(1.15); }
+
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 14px;
+            padding: 14px;
+            align-items: start;
+        }
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px;
+        }
+        .card-title {
+            font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-secondary); margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .tile { background-color: var(--bg-panel); border-radius: 8px; padding: 10px; }
+        .tile-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+        .tile-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .tile-value.small { font-size: 14px; word-break: break-all; }
+        .tile-unit { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 2px; }
+        .tiles-3 { grid-template-columns: repeat(3, 1fr); }
+        .tiles-4 { grid-template-columns: repeat(4, 1fr); }
+        .section-gap { margin-top: 12px; }
+
+        .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+        .row label { font-size: 12px; color: var(--text-secondary); width: 92px; flex-shrink: 0; }
+        .field {
+            flex: 1; min-width: 0;
+            background-color: var(--bg-panel); border: 1px solid var(--border-color);
+            color: var(--text-primary); padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none;
+        }
+        .field:focus { border-color: var(--accent-cyan); }
+        .field.num { flex: 0 0 78px; text-align: right; font-variant-numeric: tabular-nums; }
+        .hint { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin-top: 6px; }
+        .joint-name { font-size: 12px; color: var(--text-secondary); width: 92px; flex-shrink: 0; }
+        .joint-range { font-size: 11px; color: var(--text-muted); }
+        .btn-jog { width: 30px; padding: 7px 0; }
+
+        .terminal {
+            margin: 0 14px 14px; background-color: var(--bg-card);
+            border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;
+        }
+        .terminal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; border-bottom: 1px solid var(--border-color);
+            font-size: 12px; color: var(--text-secondary); gap: 10px; flex-wrap: wrap;
+        }
+        .terminal-output {
+            height: 180px; overflow-y: auto; padding: 8px 12px;
+            font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.5;
+            user-select: text;
+        }
+        .log-tx { color: var(--accent-cyan); }
+        .log-rx { color: #cbd5e1; }
+        .log-success { color: var(--accent-green); }
+        .log-error { color: var(--accent-red); }
+        .log-system { color: var(--accent-amber); }
+        .terminal-input-bar { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border-color); }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <div class="brand-icon">A</div>
+            <div>
+                <span class="brand-title">Arm Controller Serial Panel</span>
+                <span class="brand-sub" id="app-name">ESP32-S3</span>
+            </div>
+        </div>
+        <div class="header-controls">
+            <span id="badge-conn" class="badge badge-secondary">Disconnected</span>
+            <button id="btn-connect" class="btn btn-primary">Connect serial</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Monitoring -->
+        <section class="card">
+            <div class="card-title">Machine <span id="badge-status" class="badge badge-secondary">--</span></div>
+            <div class="tiles">
+                <div class="tile"><div class="tile-label">Running permit</div><div class="tile-value" id="v-permit">--</div></div>
+                <div class="tile"><div class="tile-label">Motion</div><div class="tile-value" id="v-moving">--</div></div>
+                <div class="tile"><div class="tile-label">Control</div><div class="tile-value" id="v-manual">--</div></div>
+                <div class="tile" id="tile-distance"><div class="tile-label">Obstacle distance</div><div class="tile-value" id="v-distance">--</div></div>
+            </div>
+
+            <div class="card-title section-gap">TCP position</div>
+            <div class="tiles tiles-3">
+                <div class="tile"><div class="tile-label">X forward</div><div class="tile-value"><span id="v-x">--</span><span class="tile-unit">mm</span></div></div>
+                <div class="tile"><div class="tile-label">Y side</div><div class="tile-value"><span id="v-y">--</span><span class="tile-unit">mm</span></div></div>
+                <div class="tile"><div class="tile-label">Z up</div><div class="tile-value"><span id="v-z">--</span><span class="tile-unit">mm</span></div></div>
+            </div>
+
+            <div class="card-title section-gap">Joint angles (physical)</div>
+            <div class="tiles tiles-4">
+                <div class="tile"><div class="tile-label">1 Base</div><div class="tile-value"><span id="v-j1">--</span><span class="tile-unit">&deg;</span></div></div>
+                <div class="tile"><div class="tile-label">2 Shoulder</div><div class="tile-value"><span id="v-j2">--</span><span class="tile-unit">&deg;</span></div></div>
+                <div class="tile"><div class="tile-label">3 Elbow</div><div class="tile-value"><span id="v-j3">--</span><span class="tile-unit">&deg;</span></div></div>
+                <div class="tile"><div class="tile-label">4 Wrist</div><div class="tile-value"><span id="v-j4">--</span><span class="tile-unit">&deg;</span></div></div>
+            </div>
+        </section>
+
+        <!-- Control -->
+        <section class="card">
+            <div class="card-title">Control</div>
+            <div class="row">
+                <button id="btn-permit-on" class="btn btn-success need-conn">Permit ON</button>
+                <button id="btn-permit-off" class="btn btn-secondary need-conn">Permit OFF</button>
+                <button id="btn-home" class="btn btn-secondary need-conn">Home</button>
+                <button id="btn-stop" class="btn btn-danger need-conn">Stop</button>
+            </div>
+
+            <div class="card-title section-gap">Move TCP (mm)</div>
+            <div class="row">
+                <input id="in-x" class="field num" type="number" step="1" value="186" aria-label="X">
+                <input id="in-y" class="field num" type="number" step="1" value="0" aria-label="Y">
+                <input id="in-z" class="field num" type="number" step="1" value="47" aria-label="Z">
+                <button id="btn-xyz" class="btn btn-primary need-conn">Go</button>
+                <button id="btn-xyz-copy" class="btn btn-secondary" title="Copy the current position into the fields">Use current</button>
+            </div>
+
+            <div class="card-title section-gap">
+                Jog joints
+                <select id="sel-step" class="field" style="flex:0 0 auto; padding:3px 6px; font-size:12px;" aria-label="Jog step">
+                    <option value="1">1&deg;</option>
+                    <option value="5" selected>5&deg;</option>
+                    <option value="10">10&deg;</option>
+                </select>
+            </div>
+            <div id="joint-rows"></div>
+            <div class="hint">Serial moves work without the running permit. They are refused in manual mode, while an HTTP command is running, and (joints 1 to 3) while the obstacle alarm is active.</div>
+        </section>
+
+        <!-- Network + configuration -->
+        <section class="card">
+            <div class="card-title">Network <span id="badge-wifi" class="badge badge-secondary">--</span></div>
+            <div class="tiles">
+                <div class="tile"><div class="tile-label">Wi-Fi network</div><div class="tile-value small" id="v-ssid">--</div></div>
+                <div class="tile"><div class="tile-label">ESP32 IP address</div><div class="tile-value small" id="v-ip">--</div></div>
+                <div class="tile"><div class="tile-label">Signal</div><div class="tile-value small" id="v-rssi">--</div></div>
+                <div class="tile"><div class="tile-label">Gateway (SCADA)</div><div class="tile-value small" id="v-gw">--</div></div>
+            </div>
+
+            <div class="card-title section-gap">Configuration <span id="badge-pending" class="badge badge-warning" hidden>Reboot to apply</span></div>
+            <div class="row"><label for="cfg-ssid">Wi-Fi name</label><input id="cfg-ssid" class="field" type="text" maxlength="32" autocomplete="off"></div>
+            <div class="row">
+                <label for="cfg-pass">Wi-Fi password</label>
+                <input id="cfg-pass" class="field" type="password" maxlength="63" autocomplete="new-password" placeholder="leave blank to keep">
+                <button id="btn-show-pass" class="btn btn-secondary" type="button">Show</button>
+            </div>
+            <div class="row"><label for="cfg-gwhost">Gateway host</label><input id="cfg-gwhost" class="field" type="text" maxlength="63" autocomplete="off"></div>
+            <div class="row"><label for="cfg-gwport">Gateway port</label><input id="cfg-gwport" class="field num" type="number" min="1" max="65535"></div>
+            <div class="row">
+                <button id="btn-save" class="btn btn-primary need-conn">Save to board</button>
+                <button id="btn-reboot" class="btn btn-secondary need-conn">Reboot</button>
+                <button id="btn-reload-cfg" class="btn btn-secondary need-conn" title="Discard edits and show what is stored on the board">Reload</button>
+            </div>
+            <div class="hint" id="cfg-hint">Settings are stored in the ESP32's flash and used from the next boot. The password is never read back from the board.</div>
+        </section>
+    </main>
+
+    <div class="terminal">
+        <div class="terminal-header">
+            <span>Serial log</span>
+            <span>
+                <label><input type="checkbox" id="chk-show-poll"> show INFO polling</label>
+                <button id="btn-clear" class="btn btn-secondary" style="margin-left:10px;">Clear</button>
+            </span>
+        </div>
+        <div id="terminal-output" class="terminal-output"></div>
+        <div class="terminal-input-bar">
+            <input id="terminal-input" class="field" type="text" placeholder="Type a command (HELP, STATUS, XYZ 180 0 50 ...) and press Enter" autocomplete="off">
+            <button id="btn-send" class="btn btn-primary need-conn">Send</button>
+        </div>
+    </div>
+
+    <script src="serial.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -4,13 +4,13 @@ Nov 11, 2026 · @Leeky
 
 ## 1. Overview
 
-The system has 11 interfaces across three subsystems. Each interface is listed with its inputs, outputs, behaviour and the data types it uses.
+The system has 13 interfaces across three subsystems. Each interface is listed with its inputs, outputs, behaviour and the data types it uses.
 
 | Subsystem | Role | Interfaces |
 | --- | --- | --- |
 | SCADA/HMI | Shows the process state, alarms and sorting results to the operator | 3 |
 | Vision | Reads the part labels and, optionally, locates the part on the conveyor | 2 |
-| Controller | Drives the robot arm and the conveyor, and stores the position config | 6 |
+| Controller | Drives the robot arm and the conveyor, and stores the position config | 8 |
 
 **Conventions**
 
@@ -41,6 +41,7 @@ The system has 11 interfaces across three subsystems. Each interface is listed w
 | `"place"` | Placing the part |
 | `"idle"` | Running, but waiting with no task |
 | `"stop"` | Machine is stopped |
+| `"manual"` | The arm is under local joystick control. Commands from the HMI and the automatic program are rejected until manual control is released, after which the status becomes `"stop"` |
 
 ### 2.2 report alarm
 
@@ -185,6 +186,27 @@ See section 5 for an example config.
 | Input | `void` |
 | Output | `X`, `Y`, `Z` (mm) |
 | Behaviour | Computes forward kinematics from the current joint angles and returns the world-frame coordinates of the arm TCP. |
+
+### 4.7 get current joint position
+
+| Field | Value |
+| --- | --- |
+| Input | `void` |
+| Output | `angles` (array of degrees) |
+| Behaviour | Returns the current angle of every joint, ordered by `joint number` as used in **set joint position** (4.3). |
+
+### 4.8 get obstacle distance
+
+| Field | Value |
+| --- | --- |
+| Input | `void` |
+| Output | `distance` (int, mm) |
+| Behaviour | Returns the latest distance measured by the ultrasonic sensor on the arm's tool head. Only available on arms fitted with the sensor. |
+
+| `distance` (int) | Meaning |
+| --- | --- |
+| `0` or greater | Distance to the nearest obstacle, in mm |
+| `-1` | No echo was received, so nothing is in range |
 
 ## 5. Example position config
 
