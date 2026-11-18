@@ -8,9 +8,41 @@
 #include "NetConfig.example.h"
 #endif
 
+// For NetConfig.h files made before the report paths existed.
+#ifndef NET_SCADA_STATUS_PATH
+#define NET_SCADA_STATUS_PATH "/scada/report-current-status"
+#endif
+#ifndef NET_SCADA_ALARM_PATH
+#define NET_SCADA_ALARM_PATH "/scada/report-alarm"
+#endif
+
 namespace {
 const char *const kNamespace = "armcfg";
+// The serial console takes lines of up to 127 characters, "SET STPATH " included.
+const size_t kMaxPathLength = 100;
 DeviceSettings g_active;
+
+// A report path: starts with '/', printable ASCII, no spaces.
+const char *checkPath(const char *value) {
+    const size_t len = strlen(value);
+    if (value[0] != '/') return "path must start with /";
+    if (len > kMaxPathLength) return "path must be at most 100 characters";
+    for (const char *c = value; *c; c++) {
+        if (*c <= ' ' || *c > '~') return "path must not contain spaces or special characters";
+    }
+    return nullptr;
+}
+
+// Stores a path, or forgets it when `value` is empty.
+const char *setPath(Preferences &prefs, const char *nvsKey, const char *value) {
+    if (*value == '\0') {
+        if (prefs.isKey(nvsKey)) prefs.remove(nvsKey);
+        return nullptr;
+    }
+    const char *error = checkPath(value);
+    if (!error) prefs.putString(nvsKey, value);
+    return error;
+}
 
 DeviceSettings read() {
     DeviceSettings s;
@@ -21,6 +53,8 @@ DeviceSettings read() {
     s.wifiPassword = prefs.getString("pass", NET_WIFI_PASSWORD);
     s.scadaHost = prefs.getString("gwhost", NET_SCADA_HOST);
     s.scadaPort = prefs.getUShort("gwport", NET_SCADA_PORT);
+    s.scadaStatusPath = prefs.getString("stpath", NET_SCADA_STATUS_PATH);
+    s.scadaAlarmPath = prefs.getString("alpath", NET_SCADA_ALARM_PATH);
     prefs.end();
     return s;
 }
@@ -65,8 +99,12 @@ const char *set(const char *key, const char *value) {
         } else {
             prefs.putUShort("gwport", (uint16_t)port);
         }
+    } else if (strcasecmp(key, "STPATH") == 0) {
+        error = setPath(prefs, "stpath", value);
+    } else if (strcasecmp(key, "ALPATH") == 0) {
+        error = setPath(prefs, "alpath", value);
     } else {
-        error = "unknown key (use SSID, PASS, GWHOST, GWPORT)";
+        error = "unknown key (use SSID, PASS, GWHOST, GWPORT, STPATH, ALPATH)";
     }
     prefs.end();
     return error;

@@ -17,9 +17,12 @@ struct Lock {
 };
 }  // namespace
 
-void ScadaClient::begin(const char *host, uint16_t port) {
+void ScadaClient::begin(const char *host, uint16_t port, const char *statusPath,
+                        const char *alarmPath) {
     host_ = host;
     port_ = port;
+    statusPath_ = statusPath;
+    alarmPath_ = alarmPath;
     mutex_ = xSemaphoreCreateMutex();
     xTaskCreatePinnedToCore(taskEntry, "scada", 8192, this, 2, &task_, 0);
 }
@@ -63,11 +66,11 @@ bool ScadaClient::send(const Event &e) {
     JsonDocument doc;
     const char *path;
     if (e.isAlarm) {
-        path = "/scada/report-alarm";
+        path = alarmPath_;
         doc["alarm_message"] = e.text;
         doc["alarm_status"] = e.active;
     } else {
-        path = "/scada/report-current-status";
+        path = statusPath_;
         doc["status"] = e.text;
     }
     String body;

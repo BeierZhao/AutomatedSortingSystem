@@ -15,6 +15,7 @@ let info = null;          // last INFO object
 let pollTimer = null;
 let lastInfoAt = 0;
 let cfgDirty = false;     // the user is editing the configuration fields
+let epDirty = false;      // the user is editing the SCADA endpoint fields
 
 // ---------------- Serial log ----------------
 
@@ -111,6 +112,37 @@ function render() {
 
     $('badge-pending').hidden = !info.cfg.pending;
     if (!cfgDirty) fillConfig();
+
+    // Firmware without endpoint settings sends no paths.
+    const hasPaths = typeof info.cfg.stpath === 'string';
+    $('badge-ep-pending').hidden = !hasPaths ||
+        (info.cfg.stpath === w.stpath && info.cfg.alpath === w.alpath);
+    if (!epDirty) fillEndpoints();
+    updateUrlPreview();
+}
+
+function fillEndpoints() {
+    if (!info || typeof info.cfg.stpath !== 'string') return;
+    $('ep-status').value = info.cfg.stpath;
+    $('ep-alarm').value = info.cfg.alpath;
+}
+
+// Full URLs the reports would go to, with the host and port being edited
+// (or stored) in the Network card.
+function updateUrlPreview() {
+    const host = $('cfg-gwhost').value.trim() || (info ? info.cfg.gwhost : '');
+    const port = $('cfg-gwport').value || (info ? info.cfg.gwport : '');
+    const base = `http://${host}:${port}`;
+    $('ep-status-url').textContent = base + $('ep-status').value.trim();
+    $('ep-alarm-url').textContent = base + $('ep-alarm').value.trim();
+}
+
+// Same rule as the firmware (src/common/Settings.cpp).
+function checkPath(path, name) {
+    if (!path.startsWith('/')) return `${name} must start with /.`;
+    if (path.length > 100) return `${name} must be at most 100 characters.`;
+    if (!/^[\x21-\x7e]+$/.test(path)) return `${name} must not contain spaces or special characters.`;
+    return null;
 }
 
 function fillConfig() {
@@ -273,6 +305,48 @@ $('btn-save').addEventListener('click', async () => {
     await send(`SET GWPORT ${port}`);
     hint.textContent = 'Saved on the board. Press Reboot to connect with the new settings.';
     cfgDirty = false;
+});
+
+// ---------------- SCADA endpoints ----------------
+
+['ep-status', 'ep-alarm'].forEach((id) => {
+    $(id).addEventListener('input', () => { epDirty = true; updateUrlPreview(); });
+});
+['cfg-gwhost', 'cfg-gwport'].forEach((id) => $(id).addEventListener('input', updateUrlPreview));
+
+function endpointsSupported() {
+    if (info && typeof info.cfg.stpath === 'string') return true;
+    $('ep-hint').textContent = 'This firmware has no endpoint settings. Flash a newer build.';
+    return false;
+}
+
+$('btn-ep-reload').addEventListener('click', () => {
+    epDirty = false;
+    fillEndpoints();
+    updateUrlPreview();
+});
+
+$('btn-ep-save').addEventListener('click', async () => {
+    if (!endpointsSupported()) return;
+    const status = $('ep-status').value.trim();
+    const alarm = $('ep-alarm').value.trim();
+    const error = checkPath(status, 'The status path') || checkPath(alarm, 'The alarm path');
+    if (error) { $('ep-hint').textContent = error; return; }
+
+    await send(`SET STPATH ${status}`);
+    await send(`SET ALPATH ${alarm}`);
+    $('ep-hint').textContent = 'Saved on the board. Press Reboot (Network card) to use the new paths.';
+    epDirty = false;
+});
+
+$('btn-ep-default').addEventListener('click', async () => {
+    if (!endpointsSupported()) return;
+    if (!confirm('Forget the stored paths and use the defaults built into the firmware?')) return;
+    // An empty value removes the stored path.
+    await send('SET STPATH');
+    await send('SET ALPATH');
+    $('ep-hint').textContent = 'Stored paths cleared. The firmware defaults are used from the next boot.';
+    epDirty = false;
 });
 
 $('btn-reboot').addEventListener('click', () => {

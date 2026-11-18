@@ -130,6 +130,7 @@
         .field:focus { border-color: var(--accent-cyan); }
         .field.num { flex: 0 0 78px; text-align: right; font-variant-numeric: tabular-nums; }
         .hint { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin-top: 6px; }
+        .url-preview { font-family: Consolas, "Courier New", monospace; margin: -2px 0 0 100px; word-break: break-all; }
         .joint-name { font-size: 12px; color: var(--text-secondary); width: 92px; flex-shrink: 0; }
         .joint-range { font-size: 11px; color: var(--text-muted); }
         .btn-jog { width: 30px; padding: 7px 0; }
@@ -276,6 +277,20 @@
                 <button id="btn-reload-cfg" class="btn btn-secondary need-conn" title="Discard edits and show what is stored on the board">Reload</button>
             </div>
             <div class="hint" id="cfg-hint">Settings are stored in the ESP32's flash and used from the next boot. The password is never read back from the board.</div>
+        </section>
+
+        <section class="card">
+            <div class="card-title">SCADA endpoints <span id="badge-ep-pending" class="badge badge-warning" hidden>Reboot to apply</span></div>
+            <div class="row"><label for="ep-status">Status path</label><input id="ep-status" class="field" type="text" maxlength="100" autocomplete="off" spellcheck="false"></div>
+            <div class="hint url-preview" id="ep-status-url">--</div>
+            <div class="row section-gap"><label for="ep-alarm">Alarm path</label><input id="ep-alarm" class="field" type="text" maxlength="100" autocomplete="off" spellcheck="false"></div>
+            <div class="hint url-preview" id="ep-alarm-url">--</div>
+            <div class="row section-gap">
+                <button id="btn-ep-save" class="btn btn-primary need-conn">Save to board</button>
+                <button id="btn-ep-default" class="btn btn-secondary need-conn" title="Forget the stored paths and use the defaults built into the firmware">Default</button>
+                <button id="btn-ep-reload" class="btn btn-secondary need-conn" title="Discard edits and show what is stored on the board">Reload</button>
+            </div>
+            <div class="hint" id="ep-hint">Where the status and alarm reports are POSTed on the SCADA receiver. Host and port come from the Network card. Used from the next boot.</div>
         </section>
     </main>
 

@@ -94,10 +94,13 @@ Plug the board in through its UART USB port and close any other serial monitor f
 | `INFO` | One line `#INFO:{json}` with the live state. The panel polls it twice a second |
 | `J <joint> <angle>` | Jog joint 1 to 4 to a physical angle |
 | `SET SSID\|PASS\|GWHOST\|GWPORT <value>` | Store a network setting. The value is the rest of the line |
+| `SET STPATH\|ALPATH <path>` | Store the path of the status (2.1) or alarm (2.2) report on the SCADA receiver, for example `/system/webdev/SortingDemo/report_status`. Starts with `/`, at most 100 characters, no spaces. Without a path, the stored one is forgotten and the `NetConfig.h` default is used |
 | `FACTORY` | Forget the stored settings, back to `NetConfig.h` |
 | `REBOOT` | Restart, which applies stored settings |
 
 The Wi-Fi password is stored in the ESP32's flash unencrypted and is never printed back.
+
+The **SCADA endpoints** card sets the report paths, so the board can report to a different receiver (the Python gateway, an Ignition WebDev project, ...) without a rebuild. It shows the full URLs built from the gateway host and port of the Network card. **Default** forgets the stored paths. Like the other settings, they are used from the next boot.
 
 ## HTTP panel
 
@@ -117,7 +120,7 @@ python tools/http_hmi/run_http_hmi.py --esp32 http://192.168.1.50   (or double-c
 | `--host` | `0.0.0.0` | Listen address. Must be reachable from the ESP32 |
 | `--no-browser`, `--verbose` | | Do not open the browser; log every HTTP request |
 
-At start it prints this PC's IP addresses. Set the board's gateway host to one of them and the gateway port to `--port` (with the serial panel, or `NET_SCADA_HOST` / `NET_SCADA_PORT`), and allow the port through the Windows firewall (see `ignition_bridge/README.md`). Motion commands wait up to 30 s for the answer; send a second one while the first runs to see `rejected`.
+At start it prints this PC's IP addresses. Set the board's gateway host to one of them, the gateway port to `--port` and the report paths to `/scada/report-current-status` and `/scada/report-alarm` (with the serial panel, or `NET_SCADA_HOST` / `NET_SCADA_PORT` / `NET_SCADA_STATUS_PATH` / `NET_SCADA_ALARM_PATH`), and allow the port through the Windows firewall (see `ignition_bridge/README.md`). Motion commands wait up to 30 s for the answer; send a second one while the first runs to see `rejected`.
 
 Without a board, run it against the gateway's stub ESP32:
 
@@ -154,4 +157,4 @@ curl -X POST http://<esp32-ip>/controller/set-arm-position -H "Content-Type: app
 curl -X POST http://<esp32-ip>/controller/get-current-joint-position -d "{}"
 ```
 
-The `/scada/...` reports go to `NET_SCADA_HOST:NET_SCADA_PORT`. Without the gateway, the HTTP panel above receives and shows them.
+The status and alarm reports go to `http://<gateway host>:<gateway port><path>`, set with the serial panel (defaults: `NET_SCADA_HOST`, `NET_SCADA_PORT`, `NET_SCADA_STATUS_PATH`, `NET_SCADA_ALARM_PATH`). Without the gateway, the HTTP panel above receives and shows them.

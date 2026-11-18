@@ -13,9 +13,12 @@
 
 class ScadaClient {
 public:
-    // Starts the sender task. `host` must stay valid (use a string literal
-    // or a constant).
-    void begin(const char *host, uint16_t port);
+    // Starts the sender task. `host` and the paths must stay valid (use
+    // string literals or constants). The paths are where the status and
+    // alarm reports are POSTed on the receiver.
+    void begin(const char *host, uint16_t port,
+               const char *statusPath = "/scada/report-current-status",
+               const char *alarmPath = "/scada/report-alarm");
 
     // 2.1 report current status. Never blocks.
     void reportStatus(const char *status);
@@ -39,6 +42,8 @@ private:
 
     const char *host_ = nullptr;
     uint16_t port_ = 0;
+    const char *statusPath_ = nullptr;
+    const char *alarmPath_ = nullptr;
     SemaphoreHandle_t mutex_ = nullptr;
     TaskHandle_t task_ = nullptr;
     std::deque<Event> queue_;

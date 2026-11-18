@@ -134,8 +134,10 @@ class DemoSerial {
             joints: [0, 67, 32, 0], target: [0, 67, 32, 0],
             limits: [[-90, 90], [25, 110], [5, 50], [-90, 90]],
             x: 186.2, y: 0, z: 46.7,
-            wifi: { connected: true, ssid: 'demo-wifi', ip: '192.168.1.50', rssi: -52, gwhost: '192.168.1.10', gwport: 8080 },
-            cfg: { ssid: 'demo-wifi', pass_set: true, gwhost: '192.168.1.10', gwport: 8080, pending: false },
+            wifi: { connected: true, ssid: 'demo-wifi', ip: '192.168.1.50', rssi: -52, gwhost: '192.168.1.10', gwport: 8080,
+                    stpath: '/scada/report-current-status', alpath: '/scada/report-alarm' },
+            cfg: { ssid: 'demo-wifi', pass_set: true, gwhost: '192.168.1.10', gwport: 8080,
+                   stpath: '/scada/report-current-status', alpath: '/scada/report-alarm', pending: false },
             distance: 183, alarm: false,
             joystick: { raw_x: 2048, raw_y: 2048, centre_x: 2048, centre_y: 2048, x: 0, y: 0, sw: false }
         };
@@ -192,10 +194,13 @@ class DemoSerial {
             if (key === 'PASS') s.cfg.pass_set = m[2].length > 0;
             if (key === 'GWHOST') s.cfg.gwhost = m[2];
             if (key === 'GWPORT') s.cfg.gwport = +m[2];
+            if (key === 'STPATH') s.cfg.stpath = m[2] || '/scada/report-current-status';
+            if (key === 'ALPATH') s.cfg.alpath = m[2] || '/scada/report-alarm';
             s.cfg.pending = true;
             reply(`#CFG:OK ${key} stored, REBOOT to apply`);
         } else if (up === 'REBOOT') {
             s.wifi.ssid = s.cfg.ssid; s.wifi.gwhost = s.cfg.gwhost; s.wifi.gwport = s.cfg.gwport;
+            s.wifi.stpath = s.cfg.stpath; s.wifi.alpath = s.cfg.alpath;
             s.cfg.pending = false; s.permit = false; s.status = 'stop';
             reply('#CFG:OK rebooting');
         } else {

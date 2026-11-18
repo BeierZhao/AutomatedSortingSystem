@@ -53,6 +53,8 @@ void printInfo(Stream &io) {
     wifi["rssi"] = connected ? WiFi.RSSI() : 0;
     wifi["gwhost"] = settings::active().scadaHost;
     wifi["gwport"] = settings::active().scadaPort;
+    wifi["stpath"] = settings::active().scadaStatusPath;
+    wifi["alpath"] = settings::active().scadaAlarmPath;
 
     // Stored values = what the next boot will use. The password itself is
     // never printed.
@@ -63,10 +65,14 @@ void printInfo(Stream &io) {
     cfgOut["pass_set"] = stored.wifiPassword.length() > 0;
     cfgOut["gwhost"] = stored.scadaHost;
     cfgOut["gwport"] = stored.scadaPort;
+    cfgOut["stpath"] = stored.scadaStatusPath;
+    cfgOut["alpath"] = stored.scadaAlarmPath;
     cfgOut["pending"] = stored.wifiSsid != active.wifiSsid ||
                         stored.wifiPassword != active.wifiPassword ||
                         stored.scadaHost != active.scadaHost ||
-                        stored.scadaPort != active.scadaPort;
+                        stored.scadaPort != active.scadaPort ||
+                        stored.scadaStatusPath != active.scadaStatusPath ||
+                        stored.scadaAlarmPath != active.scadaAlarmPath;
 
     if (g_extra) g_extra(info);
 

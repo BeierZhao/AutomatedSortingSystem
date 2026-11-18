@@ -42,7 +42,9 @@ void setup() {
     hmi::begin(console, driver, machine, "sorting");
 
     wifiBegin(appNetworkConfig());
-    scada.begin(settings::active().scadaHost.c_str(), settings::active().scadaPort);
+    const DeviceSettings &net = settings::active();
+    scada.begin(net.scadaHost.c_str(), net.scadaPort, net.scadaStatusPath.c_str(),
+                net.scadaAlarmPath.c_str());
     machine.onStatus([](const char *status) { scada.reportStatus(status); });
     scada.reportStatus(machine.status());
     api.begin();
