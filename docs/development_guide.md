@@ -252,7 +252,7 @@ Deployment: allow the HTTP port through the Windows firewall, and start the gate
 
 In the Ignition Gateway, add an OPC UA connection to `opc.tcp://127.0.0.1:4840/arm-gateway` with security policy None and anonymous login.
 
-Node IDs are strings in the gateway's namespace: `ns=2;s=<path>`. For example, `ns=2;s=Arm/X`. The index 2 is what `asyncua` assigns to the first registered namespace. If browsing shows a different index, use that one.
+Node IDs are strings in the gateway's namespace: `ns=2;s=<path>`. For example, `ns=2;s=Arm/X`. The index 2 is what `asyncua` assigns to the first registered namespace. If browsing shows a different index, use that one. In the browser the nodes are under `Objects/ArmGateway/`.
 
 "R" means Ignition only reads the node. "RW" means Ignition writes it.
 
@@ -283,7 +283,9 @@ Node IDs are strings in the gateway's namespace: `ns=2;s=<path>`. For example, `
 | `Result/Repository` | String | R | `Repo<N>` or `manual` | Sorting |
 | `Result/SortingResult` | Boolean | R | True if the part was placed | Sorting |
 
-The sorting project will add more mapped alarm nodes under `Alarms/` as its alarm messages are defined.
+The sorting project will add more mapped alarm nodes under `Alarms/` as its alarm messages are defined. Mapped alarm nodes, including `Alarms/Obstacle`, are created from the alarm table in the gateway's config file.
+
+Before the first report arrives, `Status/Current` is an empty string and `Comm/LastReportTime` is `1601-01-01 00:00:00 UTC`, the OPC UA minimum date. While the ESP32 is offline, the nodes under `Arm/` keep their last values.
 
 ### 7.3 Command nodes
 
@@ -295,7 +297,7 @@ Every command has the same four or five status nodes. Their meaning is the same 
 | `Done` | The command finished successfully |
 | `Invalid` | The controller answered `"invalid"`: no IK solution, or outside joint limits |
 | `Rejected` | The controller answered `"rejected"`: another command was running, the machine was in `stop` or `manual`, or the motion was interrupted |
-| `CommFault` | The gateway could not reach the ESP32, or the request timed out |
+| `CommFault` | The gateway could not reach the ESP32, the request timed out, or the ESP32 answered with an HTTP error or an answer the gateway does not understand |
 
 | Node path | Type | Access | Meaning | Project |
 | --- | --- | --- | --- | --- |
@@ -332,7 +334,7 @@ Every command has the same four or five status nodes. Their meaning is the same 
 | `Cmd/UpdatePositionConfig/Execute` | Boolean | RW | Write true to send | Sorting |
 | `Cmd/UpdatePositionConfig/Busy` | Boolean | R | | Sorting |
 | `Cmd/UpdatePositionConfig/Done` | Boolean | R | | Sorting |
-| `Cmd/UpdatePositionConfig/Failed` | Boolean | R | The controller answered `operation_done = false` | Sorting |
+| `Cmd/UpdatePositionConfig/Failed` | Boolean | R | The controller answered `operation_done = false`, or `ConfigJson` is not a JSON object (then nothing is sent) | Sorting |
 | `Cmd/UpdatePositionConfig/CommFault` | Boolean | R | | Sorting |
 
 ### 7.4 Command handshake

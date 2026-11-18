@@ -101,6 +101,25 @@
         .tiles-4 { grid-template-columns: repeat(4, 1fr); }
         .section-gap { margin-top: 12px; }
 
+        .joy-layout { display: flex; gap: 8px; align-items: stretch; }
+        .joy-tiles { flex: 1; }
+        .joy-raw { margin: 4px 0 0; font-variant-numeric: tabular-nums; }
+        .joy-pad {
+            position: relative; flex: 0 0 96px; height: 96px;
+            background-color: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px;
+            background-image:
+                linear-gradient(var(--border-color), var(--border-color)),
+                linear-gradient(var(--border-color), var(--border-color));
+            background-size: 100% 1px, 1px 100%;
+            background-position: center, center;
+            background-repeat: no-repeat;
+        }
+        .joy-dot {
+            position: absolute; width: 12px; height: 12px; border-radius: 50%;
+            background-color: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan-glow);
+            left: 50%; top: 50%; transform: translate(-50%, -50%);
+        }
+
         .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
         .row label { font-size: 12px; color: var(--text-secondary); width: 92px; flex-shrink: 0; }
         .field {
@@ -176,6 +195,28 @@
                 <div class="tile"><div class="tile-label">2 Shoulder</div><div class="tile-value"><span id="v-j2">--</span><span class="tile-unit">&deg;</span></div></div>
                 <div class="tile"><div class="tile-label">3 Elbow</div><div class="tile-value"><span id="v-j3">--</span><span class="tile-unit">&deg;</span></div></div>
                 <div class="tile"><div class="tile-label">4 Wrist</div><div class="tile-value"><span id="v-j4">--</span><span class="tile-unit">&deg;</span></div></div>
+            </div>
+
+            <!-- Joystick input, 4-DOF build only -->
+            <div id="joystick-block" hidden>
+                <div class="card-title section-gap">Joystick input <span id="badge-sw" class="badge badge-secondary">SW released</span></div>
+                <div class="joy-layout">
+                    <div class="joy-pad" title="Processed stick position: up = +X (forward), right = +Y (side)">
+                        <div id="joy-dot" class="joy-dot"></div>
+                    </div>
+                    <div class="tiles joy-tiles">
+                        <div class="tile">
+                            <div class="tile-label">X processed (-1 to +1)</div>
+                            <div class="tile-value" id="v-joy-x">--</div>
+                            <div class="tile-label joy-raw">raw <span id="v-joy-rawx">--</span> / centre <span id="v-joy-cx">--</span></div>
+                        </div>
+                        <div class="tile">
+                            <div class="tile-label">Y processed (-1 to +1)</div>
+                            <div class="tile-value" id="v-joy-y">--</div>
+                            <div class="tile-label joy-raw">raw <span id="v-joy-rawy">--</span> / centre <span id="v-joy-cy">--</span></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 

@@ -84,6 +84,24 @@ function render() {
         if (document.activeElement !== input && !input.dataset.edited) input.value = info.target[i];
     });
 
+    // Joystick readings exist only in the 4-DOF build.
+    const js = info.joystick;
+    $('joystick-block').hidden = !js;
+    if (js) {
+        $('v-joy-x').textContent = js.x.toFixed(2);
+        $('v-joy-y').textContent = js.y.toFixed(2);
+        $('v-joy-rawx').textContent = js.raw_x;
+        $('v-joy-rawy').textContent = js.raw_y;
+        $('v-joy-cx').textContent = js.centre_x;
+        $('v-joy-cy').textContent = js.centre_y;
+        setBadge($('badge-sw'), js.sw ? 'SW pressed' : 'SW released', js.sw ? 'warning' : 'secondary');
+        // World X (forward) is drawn upward, world Y (side) to the right.
+        const dot = $('joy-dot');
+        dot.style.left = `${50 + 42 * js.y}%`;
+        dot.style.top = `${50 - 42 * js.x}%`;
+        dot.style.backgroundColor = js.x || js.y ? 'var(--accent-cyan)' : 'var(--text-muted)';
+    }
+
     const w = info.wifi;
     setBadge($('badge-wifi'), w.connected ? 'Wi-Fi connected' : 'Wi-Fi not connected', w.connected ? 'success' : 'danger');
     $('v-ssid').textContent = w.ssid || '--';

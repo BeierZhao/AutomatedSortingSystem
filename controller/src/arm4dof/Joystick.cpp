@@ -31,8 +31,7 @@ void Joystick::begin(int vrxPin, int vryPin, int swPin) {
 }
 
 // Deflection from -1 to +1, with a deadband around the centre.
-float Joystick::readAxis(int pin, int centre) const {
-    const int raw = analogRead(pin);
+float Joystick::normalise(int raw, int centre) const {
     const float span = raw >= centre ? (float)(kAdcMax - centre) : (float)centre;
     float v = span > 0.0f ? (raw - centre) / span : 0.0f;
     v = constrain(v, -1.0f, 1.0f);
@@ -42,9 +41,7 @@ float Joystick::readAxis(int pin, int centre) const {
     return v > 0.0f ? mag : -mag;
 }
 
-void Joystick::manualStep(float dt) {
-    const float vx = kJoystickXSign * readAxis(vrxPin_, centreX_);
-    const float vy = kJoystickYSign * readAxis(vryPin_, centreY_);
+void Joystick::manualStep(float vx, float vy, float dt) {
     if (vx == 0.0f && vy == 0.0f) return;
 
     const ArmConfig &cfg = machine_.config();
@@ -102,6 +99,16 @@ void Joystick::taskLoop() {
         }
         swLast_ = sw;
 
-        if (machine_.manual()) manualStep(kPeriodMs / 1000.0f);
+        Reading r;
+        r.rawX = analogRead(vrxPin_);
+        r.rawY = analogRead(vryPin_);
+        r.centreX = centreX_;
+        r.centreY = centreY_;
+        r.x = kJoystickXSign * normalise(r.rawX, centreX_);
+        r.y = kJoystickYSign * normalise(r.rawY, centreY_);
+        r.pressed = swStable_;
+        reading_ = r;
+
+        if (machine_.manual()) manualStep(r.x, r.y, kPeriodMs / 1000.0f);
     }
 }

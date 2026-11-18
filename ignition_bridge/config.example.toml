@@ -1,0 +1,42 @@
+# Arm gateway settings. Copy this file to config.toml and edit it.
+# See docs/development_guide.md section 6 for the meaning of each value.
+
+# "arm4dof" or "sorting". The sorting profile adds the conveyor,
+# position-config and sorting-result nodes.
+profile = "arm4dof"
+
+[esp32]
+# Address of the /controller/... HTTP server on the ESP32
+# (NET_CONTROLLER_HTTP_PORT in the firmware, default 80).
+base_url = "http://192.168.1.50:80"
+# Seconds between reads of position, joint angles and obstacle distance.
+poll_interval_s = 1.0
+# Timeout for the motion commands (set-arm-position, set-joint-position,
+# move-conveyor). The ESP32 answers them only when the motion has finished.
+motion_timeout_s = 30.0
+# Timeout for every other call.
+request_timeout_s = 2.0
+
+[http]
+# Where the gateway listens for the /scada/... reports from the ESP32.
+# The firmware must push to this machine's address and this port
+# (NET_SCADA_HOST and NET_SCADA_PORT, or the serial HMI panel).
+host = "0.0.0.0"
+port = 8080
+
+[opcua]
+# Ignition connects here. It listens on localhost only, with no security.
+endpoint = "opc.tcp://127.0.0.1:4840/arm-gateway"
+namespace_uri = "urn:group12:arm-gateway"
+
+[logging]
+level = "INFO"
+# Uncomment to also write a rotating log file (useful when started at boot).
+# file = "C:/ArmGateway/gateway.log"
+
+# Alarm table: "alarm_message text" = "Boolean node path under Alarms/".
+# The text must match the alarm_message sent by the ESP32 exactly.
+# A node is created for every entry. A message that is not listed goes to
+# Alarms/OtherMessage and Alarms/OtherActive.
+[alarms]
+"Obstacle detected" = "Alarms/Obstacle"

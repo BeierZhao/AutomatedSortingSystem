@@ -136,7 +136,8 @@ class DemoSerial {
             x: 186.2, y: 0, z: 46.7,
             wifi: { connected: true, ssid: 'demo-wifi', ip: '192.168.1.50', rssi: -52, gwhost: '192.168.1.10', gwport: 8080 },
             cfg: { ssid: 'demo-wifi', pass_set: true, gwhost: '192.168.1.10', gwport: 8080, pending: false },
-            distance: 183, alarm: false
+            distance: 183, alarm: false,
+            joystick: { raw_x: 2048, raw_y: 2048, centre_x: 2048, centre_y: 2048, x: 0, y: 0, sw: false }
         };
     }
     isSupported() { return true; }
@@ -157,6 +158,14 @@ class DemoSerial {
         const s = this.s;
         if (up === 'INFO') {
             s.distance = 150 + Math.round(40 * Math.sin(Date.now() / 1500));
+            // A stick slowly moved in a circle.
+            const t = Date.now() / 2000;
+            const j = s.joystick;
+            j.x = +(0.8 * Math.cos(t)).toFixed(2);
+            j.y = +(0.8 * Math.sin(t)).toFixed(2);
+            j.raw_x = Math.round(2048 + 2047 * j.x);
+            j.raw_y = Math.round(2048 + 2047 * j.y);
+            j.sw = Math.floor(t) % 4 === 0;
             reply('#INFO:' + JSON.stringify(s));
         } else if (up.startsWith('PERMIT ')) {
             s.permit = up.endsWith('1');

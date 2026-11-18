@@ -61,6 +61,15 @@ void setup() {
     hmi::begin(console, driver, machine, "arm4dof", [](JsonObject info) {
         info["distance"] = obstacle.distanceMm();
         info["alarm"] = obstacle.alarmActive();
+        const Joystick::Reading r = joystick.reading();
+        JsonObject js = info["joystick"].to<JsonObject>();
+        js["raw_x"] = r.rawX;
+        js["raw_y"] = r.rawY;
+        js["centre_x"] = r.centreX;
+        js["centre_y"] = r.centreY;
+        js["x"] = round(r.x * 100.0) / 100.0;
+        js["y"] = round(r.y * 100.0) / 100.0;
+        js["sw"] = r.pressed;
     });
 
     wifiBegin(appNetworkConfig());

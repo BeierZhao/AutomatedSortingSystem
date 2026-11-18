@@ -61,9 +61,26 @@ Everything below has been verified **by build and PC unit tests only**. Nothing 
 
 Differences from ArmTest: motion is interpolated, so `STATUS` shows the commanded target. `INVBASE`, `PIN`, `TEST` and `RAW` are gone (these are compile-time settings now).
 
+## Calibration sketches
+
+`test/calib_*` are three standalone sketches for checking hardware. They use nothing from `lib/` and no external library, only constants at the top of each file and serial output of the raw and the processed values.
+
+| Environment | What it does |
+| --- | --- |
+| `calib_joystick` | Prints raw ADC counts, calibrated millivolts, the normalised value and the value after deadband for both axes, plus the SW button |
+| `calib_ultrasonic` | Prints the echo time, the raw distance, the corrected distance (`SCALE`, `OFFSET_MM`) and the median |
+| `calib_servo` | Drives the four servo pins with raw LEDC PWM (no ESP32Servo). Serial commands: `u <n> <us>`, `a <n> <deg>`, `s <n>` sweep, `x <n>` off, `p` print (`n` = 1 to 4, 0 = all) |
+
+```
+pio run -e calib_servo -t upload
+pio device monitor
+```
+
+The constants found this way are not copied into the firmware automatically: put them into `src/arm4dof/Arm4dofConfig.h`, `lib/ArmKinematics/ArmConfig.h` and `ArmHardware` (pulse range) by hand.
+
 ## Serial panel
 
-`tools/serial_hmi/` is a small browser panel (Chrome or Edge, Web Serial) based on the ArmTest GUI, without the 3D view. It shows the machine status, permit, TCP position, joint angles, obstacle distance and Wi-Fi state, offers permit, home, stop, XYZ and joint jog, and stores the Wi-Fi and gateway settings on the board.
+`tools/serial_hmi/` is a small browser panel (Chrome or Edge, Web Serial) based on the ArmTest GUI, without the 3D view. It shows the machine status, permit, TCP position, joint angles, obstacle distance, joystick input (raw and processed) and Wi-Fi state, offers permit, home, stop, XYZ and joint jog, and stores the Wi-Fi and gateway settings on the board.
 
 ```
 python tools/serial_hmi/run_hmi.py          (or double-click run_hmi.bat)

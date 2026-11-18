@@ -13,11 +13,22 @@ public:
     // Reads the stick centre, so the stick must be released at power-up.
     void begin(int vrxPin, int vryPin, int swPin);
 
+    // Latest readings, refreshed at 20 Hz in every mode (for the HMI panel).
+    struct Reading {
+        int rawX, rawY;        // ADC counts, 0 to 4095
+        int centreX, centreY;  // ADC counts measured at power-up
+        float x, y;            // after centring, deadband and sign: -1 to +1
+        bool pressed;          // SW, debounced
+    };
+    Reading reading() const { return reading_; }
+
 private:
     static void taskEntry(void *self);
     void taskLoop();
-    float readAxis(int pin, int centre) const;
-    void manualStep(float dt);
+    float normalise(int raw, int centre) const;
+    void manualStep(float vx, float vy, float dt);
+
+    Reading reading_ = {0, 0, 2048, 2048, 0.0f, 0.0f, false};
 
     ArmMachine &machine_;
     int vrxPin_ = -1;
