@@ -6,7 +6,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <ESP32Servo.h>
 #include <functional>
 
 #include "ArmConfig.h"
@@ -53,17 +52,21 @@ public:
     bool isMoving();
     arm::JointAngles current();
     arm::JointAngles target();
-    bool attached(int joint) { return servo_[joint].attached(); }
+    bool attached(int joint) { return attached_[joint]; }
     const ArmHardware &hardware() const { return hw_; }
 
 private:
     static void taskEntry(void *self);
     void taskLoop();
     void writeServos(const arm::JointAngles &q);
+    void writePulseUs(int joint, float us);
 
     arm::ArmConfig cfg_;
     ArmHardware hw_;
-    Servo servo_[arm::kJointCount];
+    // Servos are driven with LEDC directly, the same way as
+    // test/calib_servo (LEDC channel j = joint j).
+    bool attached_[arm::kJointCount] = {};
+    uint32_t lastDuty_[arm::kJointCount] = {};
     arm::JointInterpolator interp_;
     SemaphoreHandle_t mutex_ = nullptr;
     DoneFn done_;

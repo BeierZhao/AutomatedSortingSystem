@@ -5,7 +5,7 @@ One PlatformIO project for both projects described in
 
 | Environment | What it builds |
 | --- | --- |
-| `arm4dof` | 4-DOF arm: shared arm controller, ultrasonic obstacle stop, buzzer, joystick manual mode |
+| `arm4dof` | 4-DOF arm: shared arm controller, ultrasonic obstacle stop, joystick manual mode |
 | `sorting` | Automated Sorting System. **Stub**: only the shared arm controller so far |
 | `native` | PC unit tests for the kinematics and the joint interpolator |
 
@@ -34,7 +34,7 @@ then add `%USERPROFILE%\.platformio\packages\toolchain-gccmingw32\bin` to the PA
 | Pins | `include/BoardPins.h` |
 | Link lengths, joint limits, servo mapping, speeds, home pose | `lib/ArmKinematics/ArmConfig.h` |
 | Tool TCP offsets | `lib/ToolHead/ToolHead.h` |
-| Obstacle thresholds, buzzer, joystick | `src/arm4dof/Arm4dofConfig.h` |
+| Obstacle thresholds, joystick | `src/arm4dof/Arm4dofConfig.h` |
 
 Not measured yet, still at the proposed defaults: wrist servo direction, offset and limits, tool offsets, obstacle thresholds, joint speeds.
 
@@ -50,7 +50,7 @@ Everything below has been verified **by build and PC unit tests only**. Nothing 
 | Serial console compatible with the ArmTest 3D GUI | Written, builds |
 | Wi-Fi and `/controller/...` endpoints 4.2, 4.3, 4.5, 4.6, 4.7 | Written, builds |
 | `/scada/report-current-status`, `/scada/report-alarm` queue | Written, builds |
-| arm4dof: obstacle monitor, buzzer, joystick, endpoint 4.8 | Written, builds |
+| arm4dof: obstacle monitor, joystick, endpoint 4.8 | Written, builds |
 | sorting: gripper, conveyor (4.4), vision client, position config (4.1), sequence, result report (2.3) | Not started |
 
 ## Serial console
@@ -99,6 +99,35 @@ Plug the board in through its UART USB port and close any other serial monitor f
 
 The Wi-Fi password is stored in the ESP32's flash unencrypted and is never printed back.
 
+## HTTP panel
+
+`tools/http_hmi/` tests the board over Wi-Fi, without the gateway or Ignition. It is one Python script (standard library only) that serves a browser panel and does two jobs:
+
+- **Receives the `/scada/...` reports** (2.1 status, 2.2 alarm, 2.3 sorting result) in place of the gateway, with the same validation (HTTP 400 and `{"error": ...}` for a bad body). The panel shows the current status, the active alarms and the last sorting results, and logs every report.
+- **Forwards the panel's `/controller/...` calls** to the ESP32, so the browser needs nothing from the board. It polls position, joint angles and obstacle distance, and offers permit, set arm position, set joint position, move conveyor, update position config and a raw request box with the full answer and round trip time.
+
+```
+python tools/http_hmi/run_http_hmi.py --esp32 http://192.168.1.50   (or double-click run_http_hmi.bat)
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--esp32` | `http://192.168.1.50` | ESP32 base URL. Can also be changed in the panel |
+| `--port` | `8080` | Port of the panel and of the `/scada` reports. Same as the gateway, so the board's settings need not change, but the gateway must not run at the same time |
+| `--host` | `0.0.0.0` | Listen address. Must be reachable from the ESP32 |
+| `--no-browser`, `--verbose` | | Do not open the browser; log every HTTP request |
+
+At start it prints this PC's IP addresses. Set the board's gateway host to one of them and the gateway port to `--port` (with the serial panel, or `NET_SCADA_HOST` / `NET_SCADA_PORT`), and allow the port through the Windows firewall (see `ignition_bridge/README.md`). Motion commands wait up to 30 s for the answer; send a second one while the first runs to see `rejected`.
+
+Without a board, run it against the gateway's stub ESP32:
+
+```
+ignition_bridge\.venv\Scripts\arm-gateway-stub --port 8081 --gateway-url http://127.0.0.1:8080
+python tools/http_hmi/run_http_hmi.py --esp32 http://127.0.0.1:8081
+```
+
+The forwarding endpoint only accepts `/controller/...` paths, but anyone on the network who can reach the port can use it to move the arm. Use it on the lab network only.
+
 ## Assumptions made where the specification and the guide are silent
 
 Raise these for team review.
@@ -114,9 +143,8 @@ Raise these for team review.
 9. XYZ moves are interpolated in joint space, so the TCP path between two points is not a straight line.
 10. Positions and angles are returned rounded to 0.1.
 11. The servo pulse range is 544 to 2400 microseconds for 0 to 180 degrees, the Arduino Nano `Servo` default that the ArmTest calibration was done with.
-12. The buzzer is an active buzzer that sounds while its pin is high.
-13. The obstacle distance is the median of five readings at 20 Hz, so the alarm reacts after about 150 ms.
-14. The joystick centre is read at power-up, so the stick must be released then.
+12. The obstacle distance is the median of five readings at 20 Hz, so the alarm reacts after about 150 ms.
+13. The joystick centre is read at power-up, so the stick must be released then.
 
 ## Trying it without the gateway
 
@@ -126,4 +154,4 @@ curl -X POST http://<esp32-ip>/controller/set-arm-position -H "Content-Type: app
 curl -X POST http://<esp32-ip>/controller/get-current-joint-position -d "{}"
 ```
 
-The `/scada/...` reports go to `NET_SCADA_HOST:NET_SCADA_PORT`. Until the gateway exists, any small HTTP server that prints POST bodies will do.
+The `/scada/...` reports go to `NET_SCADA_HOST:NET_SCADA_PORT`. Without the gateway, the HTTP panel above receives and shows them.

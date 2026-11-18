@@ -15,7 +15,7 @@ It builds on the Interface Specification ([README.md](../README.md)) and on [pro
 | | 4-DOF arm project | Automated Sorting System |
 | --- | --- | --- |
 | Arm | Same parallelogram arm, 4 servos (base, shoulder, elbow, wrist rotation) | Same arm, plus a gripper servo on the tool head |
-| Extra hardware | Ultrasonic sensor on the wrist, joystick, buzzer | Conveyor stepper, Android phone (vision) |
+| Extra hardware | Ultrasonic sensor on the wrist, joystick | Conveyor stepper, Android phone (vision) |
 | Obstacle avoidance | Yes | No |
 | Spec interfaces used | 2.1, 2.2, 4.2, 4.3, 4.5, 4.6, 4.7, 4.8 | All except 4.8 |
 
@@ -102,7 +102,7 @@ controller/
     ToolHead/             TCP offsets and tool servo
     ControllerApi/        Wi-Fi and HTTP server for /controller/..., deferred responses
     ScadaClient/          Outbound queue for /scada/... reports, with retry
-  src/arm4dof/            Obstacle monitor, joystick, buzzer
+  src/arm4dof/            Obstacle monitor, joystick
   src/sorting/            Conveyor, vision client, position config, sequence
   test/                   Unit tests, run with `pio test -e native`
 ignition_bridge/          Python gateway: HTTP to OPC UA
@@ -125,7 +125,6 @@ Build from `controller/` with `pio run -e arm4dof` or `pio run -e sorting`. The 
 | Joystick SW | 42 | Internal pull-up, active low |
 | Ultrasonic TRIG | 15 | |
 | Ultrasonic ECHO | 16 | Through a voltage divider, 5 V down to 3.3 V |
-| Buzzer | 17 | |
 
 Wiring rules:
 
@@ -161,7 +160,7 @@ Web handlers never move the arm and never block.
 **Obstacle (arm4dof only).** Proposed thresholds: stop below 100 mm, clear above 150 mm.
 
 1. Distance falls below the stop threshold.
-2. The arm freezes at its current interpolated position, and the buzzer sounds.
+2. The arm freezes at its current interpolated position.
 3. A pending motion request is answered with `"rejected"`.
 4. The ESP32 pushes `report-alarm` with `alarm_message = "Obstacle detected"` and `alarm_status = true`, then `report-current-status` with `"stop"`.
 5. When the distance rises above the clear threshold, the ESP32 pushes `report-alarm` with `alarm_status = false`.
@@ -179,7 +178,7 @@ Web handlers never move the arm and never block.
 
 In manual mode, stick deflection sets the speed of the TCP in world X and Y, with Z held, and every step passes through IK. The wrist turns the sensor toward the direction the stick is pushed.
 
-The obstacle check stays active in manual mode. While an obstacle is too close, the alarm is raised, the buzzer sounds and the TCP does not move, but the wrist still turns. Pushing the stick away from the obstacle turns the sensor away, the alarm clears, and the arm can back off. The status stays `"manual"` throughout.
+The obstacle check stays active in manual mode. While an obstacle is too close, the alarm is raised and the TCP does not move, but the wrist still turns. Pushing the stick away from the obstacle turns the sensor away, the alarm clears, and the arm can back off. The status stays `"manual"` throughout.
 
 **Serial commands.** The serial commands of the test project (`XYZ`, `HOME`, `STATUS`, and the `#OK:` acknowledgement) are kept so the existing 3D GUI still works for commissioning.
 
@@ -387,7 +386,7 @@ Use `Result/Seq`, not the result fields themselves, to detect a new part: two pa
 2. Interpolated motion, limits, stop, and the serial commands from the test project.
 3. Wi-Fi and the `/controller/...` endpoints with deferred responses, tested with curl.
 4. Wrist axis and tool head configuration.
-5. Ultrasonic sensor, obstacle alarm, buzzer, joystick.
+5. Ultrasonic sensor, obstacle alarm, joystick.
 6. Gateway: HTTP server, OPC UA nodes, command handshake, tested against a stub ESP32.
 7. Ignition: OPC UA connection, tags, history, alarms, Perspective views.
 8. Sorting build: conveyor, vision client, position config, sequence control.

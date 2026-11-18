@@ -5,6 +5,10 @@
 using namespace arm;
 
 namespace {
+const uint32_t kPwmHz = 50;   // 20 ms frame
+const uint8_t kPwmBits = 14;  // the ESP32-S3 LEDC maximum
+const float kFrameUs = 1000000.0f / kPwmHz;
+
 struct Lock {
     explicit Lock(SemaphoreHandle_t m) : m_(m) { xSemaphoreTake(m_, portMAX_DELAY); }
     ~Lock() { xSemaphoreGive(m_); }
@@ -21,10 +25,10 @@ void ArmDriver::begin(const ArmConfig &cfg, const ArmHardware &hw) {
     // power-up, as it did with ArmTest.
     interp_.reset(cfg_.home);
 
-    for (int t = 0; t < 4; t++) ESP32PWM::allocateTimer(t);
+    // LEDC channel j drives joint j, the same setup as test/calib_servo.
     for (int j = 0; j < kJointCount; j++) {
-        servo_[j].setPeriodHertz(50);
-        servo_[j].attach(hw_.pin[j], hw_.pulseMinUs, hw_.pulseMaxUs);
+        attached_[j] = ledcSetup(j, kPwmHz, kPwmBits) > 0;
+        if (attached_[j]) ledcAttachPin(hw_.pin[j], j);
     }
     writeServos(cfg_.home);
 
@@ -38,8 +42,18 @@ void ArmDriver::writeServos(const JointAngles &q) {
         float phys = constrain(q.q[j], jc.physMin, jc.physMax);
         float servo = constrain(physToServo(cfg_, j, phys), jc.servoMin, jc.servoMax);
         const float us = hw_.pulseMinUs + servo / 180.0f * (hw_.pulseMaxUs - hw_.pulseMinUs);
-        servo_[j].writeMicroseconds((int)lroundf(us));
+        writePulseUs(j, us);
     }
+}
+
+void ArmDriver::writePulseUs(int joint, float us) {
+    if (!attached_[joint]) return;
+    const uint32_t duty = (uint32_t)lroundf(us / kFrameUs * (float)(1u << kPwmBits));
+    // Write only on change: the motion task runs once per PWM period and
+    // most ticks leave the pulse unchanged.
+    if (duty == lastDuty_[joint]) return;
+    lastDuty_[joint] = duty;
+    ledcWrite(joint, duty);
 }
 
 bool ArmDriver::startMove(const JointAngles &target, DoneFn done,

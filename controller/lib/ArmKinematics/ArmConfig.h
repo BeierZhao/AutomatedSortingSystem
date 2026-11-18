@@ -55,14 +55,14 @@ inline ArmConfig defaultArmConfig() {
     c.l2 = 155.0f;
 
     // Base: invertBase = true in ArmTest, so servo = 90 - yaw.
-    c.joint[kBase] = {-90.0f, 90.0f, -1.0f, 90.0f, 0.0f, 180.0f, 60.0f};
+    c.joint[kBase] = {-70.0f, 70.0f, -1.0f, 90.0f, 20.0f, 160.0f, 60.0f};
     // Shoulder: b = servo + 5.
     c.joint[kShoulder] = {25.0f, 110.0f, 1.0f, -5.0f, 20.0f, 105.0f, 45.0f};
     // Elbow: a = servo - 40.
     c.joint[kElbow] = {5.0f, 50.0f, 1.0f, 40.0f, 45.0f, 90.0f, 45.0f};
     // Wrist: NOT MEASURED YET. Proposed default: servo centre = radially
     // outward, +/-90 degrees of travel. Re-measure sign, offset and limits.
-    c.joint[kWrist] = {-90.0f, 90.0f, 1.0f, 90.0f, 0.0f, 180.0f, 120.0f};
+    c.joint[kWrist] = {-70.0f, 70.0f, 1.0f, 90.0f, 20.0f, 170.0f, 120.0f};
 
     // Tool offsets: NOT MEASURED YET, see lib/ToolHead.
     c.tool.radialOffset = 0.0f;

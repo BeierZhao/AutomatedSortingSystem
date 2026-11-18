@@ -1,5 +1,5 @@
-// 4-DOF arm project: shared arm controller + ultrasonic obstacle stop,
-// buzzer and joystick manual mode. See docs/development_guide.md.
+// 4-DOF arm project: shared arm controller + ultrasonic obstacle stop
+// and joystick manual mode. See docs/development_guide.md.
 #include <Arduino.h>
 
 #include "AppNet.h"
@@ -25,13 +25,8 @@ static ScadaClient scada;
 static ObstacleMonitor obstacle;
 static Joystick joystick(machine);
 
-static void setBuzzer(bool on) {
-    digitalWrite(pins::kBuzzer, on == kBuzzerActiveHigh ? HIGH : LOW);
-}
-
 // Runs in the obstacle task when the alarm is raised or cleared.
 static void onObstacleAlarm(bool active) {
-    setBuzzer(active);
     machine.setTcpBlocked(active);
     scada.reportAlarm(kObstacleAlarmMessage, active);
     // Freezes the arm and answers a pending request with "rejected". Outside
@@ -42,9 +37,6 @@ static void onObstacleAlarm(bool active) {
 void setup() {
     Serial.begin(115200);
     settings::load();
-
-    pinMode(pins::kBuzzer, OUTPUT);
-    setBuzzer(false);
 
     arm::ArmConfig cfg = arm::defaultArmConfig();
     cfg.tool = arm::ultrasonicMountTool();

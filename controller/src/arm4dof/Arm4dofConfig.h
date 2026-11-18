@@ -11,10 +11,6 @@ const int kObstacleClearMm = 150;  // alarm cleared above this distance
 const int kObstacleMaxRangeMm = 4000;  // longer echoes count as "nothing in range"
 const char *const kObstacleAlarmMessage = "Obstacle detected";
 
-// ---- Buzzer ----
-// Assumption: active buzzer module that sounds while its input is HIGH.
-const bool kBuzzerActiveHigh = true;
-
 // ---- Joystick ----
 const float kManualMaxSpeedMmPerS = 40.0f;  // TCP speed at full deflection
 const float kJoystickDeadband = 0.15f;      // fraction of full deflection

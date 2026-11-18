@@ -27,6 +27,5 @@ const int kJoystickVry = 2;      // ADC1_CH1
 const int kJoystickSw = 42;      // internal pull-up, active low
 const int kUltrasonicTrig = 15;
 const int kUltrasonicEcho = 16;  // through a 5 V -> 3.3 V divider
-const int kBuzzer = 17;
 
 }  // namespace pins
