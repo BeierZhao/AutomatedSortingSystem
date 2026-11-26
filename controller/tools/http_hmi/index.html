@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arm Controller HTTP Panel</title>
+    <style>
+        /* Same colours and components as tools/serial_hmi. */
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #131b2e;
+            --bg-panel: #1a233a;
+            --border-color: #2a3756;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-cyan: #0ea5e9;
+            --accent-cyan-glow: rgba(14, 165, 233, 0.35);
+            --accent-amber: #f59e0b;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 10px;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand-icon {
+            width: 28px; height: 28px; border-radius: 6px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 14px; color: #fff;
+            box-shadow: 0 0 12px var(--accent-cyan-glow);
+        }
+        .brand-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+        .brand-sub { font-size: 12px; color: var(--text-muted); margin-left: 6px; }
+        .header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .badge-secondary { background-color: #334155; color: #cbd5e1; }
+        .badge-success { background-color: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .badge-warning { background-color: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+        .badge-danger { background-color: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .badge-info { background-color: rgba(14, 165, 233, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+
+        select, input, button, textarea { font-family: inherit; }
+        .btn {
+            padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+            border: 1px solid transparent; cursor: pointer; color: #fff; white-space: nowrap;
+        }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-primary { background-color: var(--accent-cyan); }
+        .btn-secondary { background-color: var(--bg-panel); border-color: var(--border-color); color: var(--text-primary); }
+        .btn-success { background-color: var(--accent-green); }
+        .btn-danger { background-color: var(--accent-red); }
+        .btn:not(:disabled):hover { filter: brightness(1.15); }
+
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 14px; padding: 14px; align-items: start;
+        }
+        .card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; min-width: 0; }
+        .card-title {
+            font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-secondary); margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center; gap: 8px;
+        }
+        .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .tiles-3 { grid-template-columns: repeat(3, 1fr); }
+        .tiles-4 { grid-template-columns: repeat(4, 1fr); }
+        .tile { background-color: var(--bg-panel); border-radius: 8px; padding: 10px; min-width: 0; }
+        .tile-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+        .tile-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .tile-value.small { font-size: 14px; word-break: break-all; }
+        .tile-unit { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 2px; }
+        .stale .tile-value { color: var(--text-muted); }
+        .section-gap { margin-top: 14px; }
+
+        .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+        .row label { font-size: 12px; color: var(--text-secondary); }
+        .row label.w { width: 70px; flex-shrink: 0; }
+        .field {
+            flex: 1; min-width: 0;
+            background-color: var(--bg-panel); border: 1px solid var(--border-color);
+            color: var(--text-primary); padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none;
+        }
+        .field:focus { border-color: var(--accent-cyan); }
+        .field.num { flex: 0 0 78px; text-align: right; font-variant-numeric: tabular-nums; }
+        .field.auto { flex: 0 0 auto; }
+        textarea.field { width: 100%; font-family: Consolas, "Courier New", monospace; font-size: 12px; resize: vertical; }
+        .hint { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin-top: 6px; }
+        .result { font-size: 12px; margin-left: auto; }
+
+        .alarm-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+        .alarm-list li {
+            background-color: rgba(239, 68, 68, 0.12); border: 1px solid var(--accent-red);
+            color: #fecaca; border-radius: 6px; padding: 6px 10px; font-size: 13px;
+            display: flex; justify-content: space-between; gap: 8px;
+        }
+        .alarm-list li span { color: var(--text-muted); font-size: 11px; }
+        .empty { font-size: 12px; color: var(--text-muted); }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+        th { color: var(--text-muted); font-weight: 600; }
+        .table-wrap { overflow-x: auto; max-height: 220px; overflow-y: auto; }
+
+        pre.response {
+            background-color: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 6px;
+            padding: 8px 10px; font-family: Consolas, "Courier New", monospace; font-size: 12px;
+            white-space: pre-wrap; word-break: break-all; min-height: 40px; max-height: 200px; overflow-y: auto;
+        }
+
+        .terminal { margin: 0 14px 14px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+        .terminal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; border-bottom: 1px solid var(--border-color);
+            font-size: 12px; color: var(--text-secondary); gap: 10px; flex-wrap: wrap;
+        }
+        .terminal-output {
+            height: 220px; overflow-y: auto; padding: 8px 12px;
+            font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.5; user-select: text;
+        }
+        .log-tx { color: var(--accent-cyan); }
+        .log-rx { color: #cbd5e1; }
+        .log-report { color: #c4b5fd; }
+        .log-success { color: var(--accent-green); }
+        .log-error { color: var(--accent-red); }
+        .log-system { color: var(--accent-amber); }
+
+        @media (max-width: 480px) {
+            header { padding: 10px 16px; }
+            .header-controls { width: 100%; }
+            #in-esp32 { flex: 1 1 100%; width: auto !important; }
+            main { padding: 14px 16px; grid-template-columns: 1fr; }
+            .terminal { margin: 0 16px 14px; }
+            .tiles-4 { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <div class="brand-icon">H</div>
+            <div>
+                <span class="brand-title">Arm Controller HTTP Panel</span>
+                <span class="brand-sub">/controller + /scada test</span>
+            </div>
+        </div>
+        <div class="header-controls">
+            <input id="in-esp32" class="field" style="width:220px" type="text" placeholder="http://192.168.1.50" aria-label="ESP32 address">
+            <button id="btn-esp32" class="btn btn-secondary">Set ESP32</button>
+            <span id="badge-esp" class="badge badge-secondary" title="Result of the last read cycle">ESP32 --</span>
+            <span id="badge-server" class="badge badge-secondary" title="This panel's own Python server">Server --</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Live values, read from the ESP32 -->
+        <section class="card" id="card-live">
+            <div class="card-title">
+                Live values
+                <span class="row" style="margin:0">
+                    <label><input type="checkbox" id="chk-poll" checked> poll</label>
+                    <select id="sel-interval" class="field auto" style="padding:3px 6px;font-size:12px" aria-label="Poll interval">
+                        <option value="250">0.25 s</option>
+                        <option value="500">0.5 s</option>
+                        <option value="1000" selected>1 s</option>
+                        <option value="2000">2 s</option>
+                    </select>
+                </span>
+            </div>
+            <div class="card-title">TCP position <span class="empty" id="v-poll-age"></span></div>
+            <div class="tiles tiles-3">
+                <div class="tile"><div class="tile-label">X forward</div><div class="tile-value"><span id="v-x">--</span><span class="tile-unit">mm</span></div></div>
+                <div class="tile"><div class="tile-label">Y side</div><div class="tile-value"><span id="v-y">--</span><span class="tile-unit">mm</span></div></div>
+                <div class="tile"><div class="tile-label">Z up</div><div class="tile-value"><span id="v-z">--</span><span class="tile-unit">mm</span></div></div>
+            </div>
+            <div class="card-title section-gap">Joint angles (physical)</div>
+            <div class="tiles tiles-4" id="joint-tiles"></div>
+            <div class="card-title section-gap">
+                Obstacle distance
+                <label style="text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" id="chk-distance" checked> read (4-DOF)</label>
+            </div>
+            <div class="tiles">
+                <div class="tile"><div class="tile-label">Median distance (-1 = nothing in range)</div><div class="tile-value"><span id="v-dist">--</span><span class="tile-unit">mm</span></div></div>
+                <div class="tile"><div class="tile-label">Read round trip</div><div class="tile-value"><span id="v-rtt">--</span><span class="tile-unit">ms</span></div></div>
+            </div>
+        </section>
+
+        <!-- Commands to the ESP32 -->
+        <section class="card">
+            <div class="card-title">Running permit <span id="r-permit" class="badge badge-secondary">--</span></div>
+            <div class="row">
+                <button id="btn-permit-on" class="btn btn-success">Permit ON</button>
+                <button id="btn-permit-off" class="btn btn-danger">Permit OFF</button>
+            </div>
+
+            <div class="card-title section-gap">Set arm position (mm) <span id="r-xyz" class="badge badge-secondary">--</span></div>
+            <div class="row">
+                <input id="in-x" class="field num" type="number" step="1" value="150" aria-label="X">
+                <input id="in-y" class="field num" type="number" step="1" value="0" aria-label="Y">
+                <input id="in-z" class="field num" type="number" step="1" value="50" aria-label="Z">
+                <button id="btn-xyz" class="btn btn-primary">Go</button>
+                <button id="btn-xyz-copy" class="btn btn-secondary" title="Copy the live position into the fields">Use current</button>
+            </div>
+
+            <div class="card-title section-gap">Set joint position (&deg;) <span id="r-joint" class="badge badge-secondary">--</span></div>
+            <div class="row">
+                <select id="in-joint" class="field auto" aria-label="Joint number">
+                    <option value="1">1 Base</option>
+                    <option value="2">2 Shoulder</option>
+                    <option value="3">3 Elbow</option>
+                    <option value="4">4 Wrist</option>
+                    <option value="5">5 (invalid test)</option>
+                </select>
+                <input id="in-angle" class="field num" type="number" step="1" value="0" aria-label="Angle">
+                <button id="btn-joint" class="btn btn-primary">Go</button>
+                <button id="btn-joint-copy" class="btn btn-secondary" title="Copy the live angle of this joint">Use current</button>
+            </div>
+
+            <div class="card-title section-gap">Move conveyor (sorting) <span id="r-conv" class="badge badge-secondary">--</span></div>
+            <div class="row">
+                <select id="in-dir" class="field auto" aria-label="Direction">
+                    <option value="true">forward (true)</option>
+                    <option value="false">backward (false)</option>
+                </select>
+                <input id="in-dist" class="field num" type="number" step="1" value="100" aria-label="Distance">
+                <button id="btn-conv" class="btn btn-primary">Go</button>
+            </div>
+            <div class="hint">Motion commands are answered only when the motion ends (timeout <span id="v-motion-to">30</span> s). Send a second one while the first runs to test <code>rejected</code>.</div>
+        </section>
+
+        <!-- Reports pushed by the ESP32 -->
+        <section class="card">
+            <div class="card-title">Reports from ESP32 <button id="btn-clear-reports" class="btn btn-secondary">Clear</button></div>
+            <div class="tiles">
+                <div class="tile"><div class="tile-label">Current status (2.1)</div><div class="tile-value" id="v-status">--</div></div>
+                <div class="tile"><div class="tile-label">Last report</div><div class="tile-value small" id="v-last-report">none yet</div></div>
+            </div>
+            <div class="card-title section-gap">Active alarms (2.2)</div>
+            <ul class="alarm-list" id="alarm-list"></ul>
+            <div class="card-title section-gap">Sorting results (2.3)</div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Time</th><th>Part</th><th>Read</th><th>Origin</th><th>Dest.</th><th>Repo</th><th>OK</th></tr></thead>
+                    <tbody id="result-rows"></tbody>
+                </table>
+            </div>
+            <div class="hint" id="v-report-hint">The ESP32 posts to <code>/scada/...</code> on this PC. Set its gateway host to this PC and port to the one this server listens on.</div>
+        </section>
+
+        <!-- Position config + raw requests -->
+        <section class="card">
+            <div class="card-title">Update position config (sorting) <span id="r-config" class="badge badge-secondary">--</span></div>
+            <textarea id="in-config" class="field" rows="8" spellcheck="false">{
+  "repositories": { "Repo1": {"x": 50, "y": 50, "z": 0}, "Repo2": {"x": 100, "y": 50, "z": 0} },
+  "destinations": { "Hamilton": "Repo1", "Burlington": "Repo1", "Mississauga": "Repo2" },
+  "part_dock": {"x": 10, "y": 10, "z": 10}
+}</textarea>
+            <div class="row section-gap" style="margin-top:8px">
+                <button id="btn-config" class="btn btn-primary">Send config</button>
+            </div>
+
+            <div class="card-title section-gap">Raw request</div>
+            <div class="row">
+                <input id="in-raw-ep" class="field" list="endpoints" value="/controller/get-current-arm-position" aria-label="Endpoint">
+                <datalist id="endpoints">
+                    <option value="/controller/set-arm-position">
+                    <option value="/controller/set-joint-position">
+                    <option value="/controller/set-running-permit">
+                    <option value="/controller/get-current-arm-position">
+                    <option value="/controller/get-current-joint-position">
+                    <option value="/controller/get-obstacle-distance">
+                    <option value="/controller/move-conveyor">
+                    <option value="/controller/update-position-config">
+                </datalist>
+            </div>
+            <textarea id="in-raw-body" class="field" rows="3" spellcheck="false" aria-label="Body">{}</textarea>
+            <div class="row" style="margin-top:8px">
+                <label>timeout s</label>
+                <input id="in-raw-to" class="field num" type="number" min="0.1" max="120" step="0.5" value="5">
+                <button id="btn-raw" class="btn btn-primary">Send</button>
+            </div>
+            <pre class="response" id="v-raw-resp">--</pre>
+        </section>
+    </main>
+
+    <div class="terminal">
+        <div class="terminal-header">
+            <span>Log</span>
+            <span>
+                <label><input type="checkbox" id="chk-show-poll"> show polling</label>
+                <button id="btn-clear-log" class="btn btn-secondary" style="margin-left:10px;">Clear</button>
+            </span>
+        </div>
+        <div id="log" class="terminal-output"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
