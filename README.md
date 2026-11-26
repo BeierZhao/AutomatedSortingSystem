@@ -22,7 +22,7 @@ The system has 13 interfaces across three subsystems. Each interface is listed w
 
 ## 2. SCADA/HMI interfaces
 
-### 2.1 report current status
+### 2.1 report current status[x]
 
 | Field | Value |
 | --- | --- |
@@ -43,7 +43,7 @@ The system has 13 interfaces across three subsystems. Each interface is listed w
 | `"stop"` | Machine is stopped |
 | `"manual"` | The arm is under local joystick control. Commands from the HMI and the automatic program are rejected until manual control is released, after which the status becomes `"stop"` |
 
-### 2.2 report alarm
+### 2.2 report alarm[x]
 
 | Field | Value |
 | --- | --- |
@@ -56,7 +56,7 @@ The system has 13 interfaces across three subsystems. Each interface is listed w
 | `alarm message` | string | Free text | Describes the fault |
 | `alarm status` | bool | `true` / `false` | Alarm raised / alarm reset |
 
-### 2.3 report sorting result
+### 2.3 report sorting result[ ] 
 
 | Field | Value |
 | --- | --- |
@@ -77,7 +77,7 @@ The first four inputs are passed through from **read part label** (3.1) and use 
 
 Each part has three labels: **Origin**, **Destination** and **Part ID**. The Part ID label carries a barcode.
 
-### 3.1 read part label
+### 3.1 read part label[ ]
 
 | Field | Value |
 | --- | --- |
@@ -120,7 +120,7 @@ Each part has three labels: **Origin**, **Destination** and **Part ID**. The Par
 
 ## 4. Controller interfaces
 
-### 4.1 update position config
+### 4.1 update position config[ ]
 
 | Field | Value |
 | --- | --- |
@@ -130,7 +130,7 @@ Each part has three labels: **Origin**, **Destination** and **Part ID**. The Par
 
 See section 5 for an example config.
 
-### 4.2 set arm position
+### 4.2 set arm position[x]
 
 | Field | Value |
 | --- | --- |
@@ -144,7 +144,7 @@ See section 5 for an example config.
 | `"invalid"` | No IK solution exists for the position |
 | `"rejected"` | Another command is still running |
 
-### 4.3 set joint position
+### 4.3 set joint position[ ]
 
 | Field | Value |
 | --- | --- |
@@ -158,7 +158,7 @@ See section 5 for an example config.
 | `"invalid"` | The angle is outside the joint limits |
 | `"rejected"` | Another command is still running |
 
-### 4.4 move conveyor
+### 4.4 move conveyor[ ]
 
 | Field | Value |
 | --- | --- |
@@ -171,7 +171,7 @@ See section 5 for an example config.
 | `"success"` | The conveyor moved the full requested distance |
 | `"rejected"` | Another command is still running |
 
-### 4.5 set running permit
+### 4.5 set running permit[x]
 
 | Field | Value |
 | --- | --- |
@@ -179,7 +179,7 @@ See section 5 for an example config.
 | Output | `void` |
 | Behaviour | Starts or stops the machine. |
 
-### 4.6 get current arm position
+### 4.6 get current arm position[x]
 
 | Field | Value |
 | --- | --- |
@@ -187,7 +187,7 @@ See section 5 for an example config.
 | Output | `X`, `Y`, `Z` (mm) |
 | Behaviour | Computes forward kinematics from the current joint angles and returns the world-frame coordinates of the arm TCP. |
 
-### 4.7 get current joint position
+### 4.7 get current joint position[x]
 
 | Field | Value |
 | --- | --- |
@@ -195,7 +195,7 @@ See section 5 for an example config.
 | Output | `angles` (array of degrees) |
 | Behaviour | Returns the current angle of every joint, ordered by `joint number` as used in **set joint position** (4.3). |
 
-### 4.8 get obstacle distance
+### 4.8 get obstacle distance[x]
 
 | Field | Value |
 | --- | --- |

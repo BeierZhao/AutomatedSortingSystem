@@ -44,17 +44,23 @@ const char *setPath(Preferences &prefs, const char *nvsKey, const char *value) {
     return error;
 }
 
+// getString() logs an [E] line for a key that was never stored, and INFO
+// reads the settings twice a second, so check for the key first.
+String getStr(Preferences &prefs, const char *key, const char *fallback) {
+    return prefs.isKey(key) ? prefs.getString(key, fallback) : String(fallback);
+}
+
 DeviceSettings read() {
     DeviceSettings s;
     Preferences prefs;
     // Read-write open, so the namespace is created on the first boot.
     prefs.begin(kNamespace, false);
-    s.wifiSsid = prefs.getString("ssid", NET_WIFI_SSID);
-    s.wifiPassword = prefs.getString("pass", NET_WIFI_PASSWORD);
-    s.scadaHost = prefs.getString("gwhost", NET_SCADA_HOST);
-    s.scadaPort = prefs.getUShort("gwport", NET_SCADA_PORT);
-    s.scadaStatusPath = prefs.getString("stpath", NET_SCADA_STATUS_PATH);
-    s.scadaAlarmPath = prefs.getString("alpath", NET_SCADA_ALARM_PATH);
+    s.wifiSsid = getStr(prefs, "ssid", NET_WIFI_SSID);
+    s.wifiPassword = getStr(prefs, "pass", NET_WIFI_PASSWORD);
+    s.scadaHost = getStr(prefs, "gwhost", NET_SCADA_HOST);
+    s.scadaPort = prefs.isKey("gwport") ? prefs.getUShort("gwport", NET_SCADA_PORT) : NET_SCADA_PORT;
+    s.scadaStatusPath = getStr(prefs, "stpath", NET_SCADA_STATUS_PATH);
+    s.scadaAlarmPath = getStr(prefs, "alpath", NET_SCADA_ALARM_PATH);
     prefs.end();
     return s;
 }
