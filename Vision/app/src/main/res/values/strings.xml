@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">Sorting Vision</string>
+    <string name="channel_name">Vision server</string>
+    <string name="notification_title">Vision server running</string>
+    <string name="notification_text">Listening for label read requests on port %1$d</string>
+    <string name="status_stopped">Server stopped</string>
+    <string name="status_running">Serving POST %1$s</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="test_read">Test read</string>
+    <string name="battery">Battery optimization…</string>
+    <string name="settings">Settings</string>
+    <string name="port">HTTP port</string>
+    <string name="timeout">Read timeout (ms)</string>
+    <string name="cities">Known cities (comma-separated)</string>
+    <string name="snap">Snap OCR result to nearest known city</string>
+    <string name="torch">Torch on</string>
+    <string name="save">Save</string>
+    <string name="last_read">Last capture</string>
+    <string name="log">Log</string>
+    <string name="saved">Saved</string>
+    <string name="invalid_settings">Port must be 1024–65535 and timeout at least 1000 ms</string>
+    <string name="camera_permission_needed">Camera permission is required</string>
+</resources>
