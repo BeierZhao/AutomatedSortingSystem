@@ -25,6 +25,19 @@ constexpr const char *kIdle = "idle";
 constexpr const char *kManual = "manual";
 }  // namespace status_text
 
+// An extra motion axis driven by the project, for example the conveyor of
+// the sorting build. It shares the arm's rules: one motion command at a
+// time across the arm and the axis, and it stops whenever the arm stops.
+class AuxAxis {
+public:
+    virtual ~AuxAxis() = default;
+    // True while a command on this axis is running.
+    virtual bool busy() = 0;
+    // Stops at once. A running command is aborted and its completion
+    // callback runs before stop() returns.
+    virtual void stop() = 0;
+};
+
 class ArmMachine {
 public:
     // Called exactly once after a kPending return, with kSuccess (arrived)
@@ -46,6 +59,16 @@ public:
     OpResult setArmPosition(float x, float y, float z, DoneFn done);
     OpResult setJointPosition(int jointNumber, float angle, DoneFn done);
     void setRunningPermit(bool permit);
+
+    // ---- Extra axis (sorting: conveyor) ----
+    // Call before any command arrives.
+    void attachAux(AuxAxis *aux) { aux_ = aux; }
+    // Starts a command on the extra axis under the rules of 4.2 / 4.3:
+    // kRejected in manual mode, without the running permit, or while any
+    // motion command (arm or axis) is running. Otherwise calls `start`,
+    // which returns false if the axis refused the command, and answers
+    // kPending (the axis then reports the result itself) or kRejected.
+    OpResult startAux(const std::function<bool()> &start);
 
     // ---- Read-back, never rejected ----
     arm::Pose currentPose();
@@ -79,10 +102,14 @@ private:
     struct Lock;
     void setStatus(const char *s, bool forceReport = false);
     bool movesTcp(const arm::JointAngles &from, const arm::JointAngles &to) const;
+    // A motion command is running on the arm or on the extra axis.
+    bool commandRunning();
+    void stopAll();
 
     ArmDriver &driver_;
     arm::ArmConfig cfg_;
     SemaphoreHandle_t mutex_ = nullptr;
+    AuxAxis *aux_ = nullptr;
     StatusFn statusFn_;
     const char *status_ = status_text::kStop;
     bool permit_ = false;

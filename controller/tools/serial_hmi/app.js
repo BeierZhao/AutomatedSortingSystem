@@ -7,8 +7,10 @@
 const POLL_MS = 500;
 const JOINT_NAMES = ['1 Base', '2 Shoulder', '3 Elbow', '4 Wrist'];
 
-const demo = new URLSearchParams(location.search).has('demo');
-const serial = demo ? new DemoSerial() : new SerialManager();
+const params = new URLSearchParams(location.search);
+const demo = params.has('demo');
+// ?demo simulates the 4-DOF build, ?demo=sorting the sorting build.
+const serial = demo ? new DemoSerial(params.get('demo') === 'sorting' ? 'sorting' : 'arm4dof') : new SerialManager();
 
 const $ = (id) => document.getElementById(id);
 let info = null;          // last INFO object
@@ -115,16 +117,26 @@ function render() {
 
     // Firmware without endpoint settings sends no paths.
     const hasPaths = typeof info.cfg.stpath === 'string';
+    // The sorting result report (2.3) exists only in the sorting build.
+    const hasResult = hasResultPath();
+    $('ep-result-block').hidden = !hasResult;
+    $('btn-ep-test').hidden = !hasResult;
     $('badge-ep-pending').hidden = !hasPaths ||
-        (info.cfg.stpath === w.stpath && info.cfg.alpath === w.alpath);
+        (info.cfg.stpath === w.stpath && info.cfg.alpath === w.alpath &&
+         (!hasResult || info.cfg.srpath === w.srpath));
     if (!epDirty) fillEndpoints();
     updateUrlPreview();
+}
+
+function hasResultPath() {
+    return !!info && info.app === 'sorting' && typeof info.cfg.srpath === 'string';
 }
 
 function fillEndpoints() {
     if (!info || typeof info.cfg.stpath !== 'string') return;
     $('ep-status').value = info.cfg.stpath;
     $('ep-alarm').value = info.cfg.alpath;
+    if (hasResultPath()) $('ep-result').value = info.cfg.srpath;
 }
 
 // Full URLs the reports would go to, with the host and port being edited
@@ -135,6 +147,7 @@ function updateUrlPreview() {
     const base = `http://${host}:${port}`;
     $('ep-status-url').textContent = base + $('ep-status').value.trim();
     $('ep-alarm-url').textContent = base + $('ep-alarm').value.trim();
+    $('ep-result-url').textContent = base + $('ep-result').value.trim();
 }
 
 // Same rule as the firmware (src/common/Settings.cpp).
@@ -197,7 +210,8 @@ serial.onLine = (line) => {
         return;
     }
     let kind = 'rx';
-    if (line.includes('[Nano OK]') || line.startsWith('#CFG:OK') || line.startsWith('#J:OK')) kind = 'success';
+    if (line.includes('[Nano OK]') || line.startsWith('#CFG:OK') || line.startsWith('#J:OK') ||
+        line.startsWith('#SR:OK')) kind = 'success';
     if (line.includes('IK FAIL') || line.includes('ERR') || line.includes('ERROR') ||
         line.includes('Unknown command') || line.includes('Format error')) kind = 'error';
     log(line, kind);
@@ -309,7 +323,7 @@ $('btn-save').addEventListener('click', async () => {
 
 // ---------------- SCADA endpoints ----------------
 
-['ep-status', 'ep-alarm'].forEach((id) => {
+['ep-status', 'ep-alarm', 'ep-result'].forEach((id) => {
     $(id).addEventListener('input', () => { epDirty = true; updateUrlPreview(); });
 });
 ['cfg-gwhost', 'cfg-gwport'].forEach((id) => $(id).addEventListener('input', updateUrlPreview));
@@ -330,11 +344,15 @@ $('btn-ep-save').addEventListener('click', async () => {
     if (!endpointsSupported()) return;
     const status = $('ep-status').value.trim();
     const alarm = $('ep-alarm').value.trim();
-    const error = checkPath(status, 'The status path') || checkPath(alarm, 'The alarm path');
+    const withResult = hasResultPath();
+    const result = $('ep-result').value.trim();
+    const error = checkPath(status, 'The status path') || checkPath(alarm, 'The alarm path') ||
+        (withResult ? checkPath(result, 'The sorting result path') : null);
     if (error) { $('ep-hint').textContent = error; return; }
 
     await send(`SET STPATH ${status}`);
     await send(`SET ALPATH ${alarm}`);
+    if (withResult) await send(`SET SRPATH ${result}`);
     $('ep-hint').textContent = 'Saved on the board. Press Reboot (Network card) to use the new paths.';
     epDirty = false;
 });
@@ -345,8 +363,19 @@ $('btn-ep-default').addEventListener('click', async () => {
     // An empty value removes the stored path.
     await send('SET STPATH');
     await send('SET ALPATH');
+    if (hasResultPath()) await send('SET SRPATH');
     $('ep-hint').textContent = 'Stored paths cleared. The firmware defaults are used from the next boot.';
     epDirty = false;
+});
+
+$('btn-ep-test').addEventListener('click', async () => {
+    if (!hasResultPath()) return;
+    const url = `http://${info.wifi.gwhost}:${info.wifi.gwport}${info.wifi.srpath}`;
+    if (!confirm(`Send one sorting result with example values (part 10234, Repo3) to ${url}?\n\n` +
+                 'The receiver records it like a real part. If the path is wrong, the board keeps ' +
+                 'retrying it and later reports wait behind it until the next reboot.')) return;
+    await send('SRTEST');
+    $('ep-hint').textContent = `Test result queued for ${url}. Check the receiver and the serial log.`;
 });
 
 $('btn-reboot').addEventListener('click', () => {

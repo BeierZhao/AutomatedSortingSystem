@@ -15,6 +15,9 @@
 #ifndef NET_SCADA_ALARM_PATH
 #define NET_SCADA_ALARM_PATH "/scada/report-alarm"
 #endif
+#ifndef NET_SCADA_RESULT_PATH
+#define NET_SCADA_RESULT_PATH "/scada/report-sorting-result"
+#endif
 
 namespace {
 const char *const kNamespace = "armcfg";
@@ -61,6 +64,7 @@ DeviceSettings read() {
     s.scadaPort = prefs.isKey("gwport") ? prefs.getUShort("gwport", NET_SCADA_PORT) : NET_SCADA_PORT;
     s.scadaStatusPath = getStr(prefs, "stpath", NET_SCADA_STATUS_PATH);
     s.scadaAlarmPath = getStr(prefs, "alpath", NET_SCADA_ALARM_PATH);
+    s.scadaResultPath = getStr(prefs, "srpath", NET_SCADA_RESULT_PATH);
     prefs.end();
     return s;
 }
@@ -109,8 +113,10 @@ const char *set(const char *key, const char *value) {
         error = setPath(prefs, "stpath", value);
     } else if (strcasecmp(key, "ALPATH") == 0) {
         error = setPath(prefs, "alpath", value);
+    } else if (strcasecmp(key, "SRPATH") == 0) {
+        error = setPath(prefs, "srpath", value);
     } else {
-        error = "unknown key (use SSID, PASS, GWHOST, GWPORT, STPATH, ALPATH)";
+        error = "unknown key (use SSID, PASS, GWHOST, GWPORT, STPATH, ALPATH, SRPATH)";
     }
     prefs.end();
     return error;

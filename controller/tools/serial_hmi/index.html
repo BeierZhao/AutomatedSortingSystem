@@ -285,12 +285,17 @@
             <div class="hint url-preview" id="ep-status-url">--</div>
             <div class="row section-gap"><label for="ep-alarm">Alarm path</label><input id="ep-alarm" class="field" type="text" maxlength="100" autocomplete="off" spellcheck="false"></div>
             <div class="hint url-preview" id="ep-alarm-url">--</div>
+            <div id="ep-result-block" hidden>
+                <div class="row section-gap"><label for="ep-result">Sorting result path</label><input id="ep-result" class="field" type="text" maxlength="100" autocomplete="off" spellcheck="false"></div>
+                <div class="hint url-preview" id="ep-result-url">--</div>
+            </div>
             <div class="row section-gap">
                 <button id="btn-ep-save" class="btn btn-primary need-conn">Save to board</button>
                 <button id="btn-ep-default" class="btn btn-secondary need-conn" title="Forget the stored paths and use the defaults built into the firmware">Default</button>
                 <button id="btn-ep-reload" class="btn btn-secondary need-conn" title="Discard edits and show what is stored on the board">Reload</button>
+                <button id="btn-ep-test" class="btn btn-secondary need-conn" title="Send one sorting result report with example values to the path in use now" hidden>Send test result</button>
             </div>
-            <div class="hint" id="ep-hint">Where the status and alarm reports are POSTed on the SCADA receiver. Host and port come from the Network card. Used from the next boot.</div>
+            <div class="hint" id="ep-hint">Where the reports are POSTed on the SCADA receiver. Host and port come from the Network card. Used from the next boot.</div>
         </section>
     </main>
 

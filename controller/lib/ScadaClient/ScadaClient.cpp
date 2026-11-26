@@ -18,35 +18,40 @@ struct Lock {
 }  // namespace
 
 void ScadaClient::begin(const char *host, uint16_t port, const char *statusPath,
-                        const char *alarmPath) {
+                        const char *alarmPath, const char *resultPath) {
     host_ = host;
     port_ = port;
     statusPath_ = statusPath;
     alarmPath_ = alarmPath;
+    resultPath_ = resultPath;
     mutex_ = xSemaphoreCreateMutex();
     xTaskCreatePinnedToCore(taskEntry, "scada", 8192, this, 2, &task_, 0);
 }
 
-void ScadaClient::enqueueLocked(bool isAlarm, const String &text, bool active) {
+void ScadaClient::enqueueLocked(Kind kind, const String &text, bool active) {
     if (queue_.size() >= kMaxQueue) {
-        // Drop the oldest status report. Alarms are never dropped.
+        // Drop the oldest status report. Alarms and results are never dropped.
         for (auto it = queue_.begin(); it != queue_.end(); ++it) {
-            if (!it->isAlarm) {
+            if (it->kind == Kind::kStatus) {
                 queue_.erase(it);
                 break;
             }
         }
     }
-    queue_.push_back(Event{nextSeq_++, isAlarm, text, active});
+    queue_.push_back(Event{nextSeq_++, kind, text, active});
+}
+
+void ScadaClient::wake() {
+    if (task_) xTaskNotifyGive(task_);
 }
 
 void ScadaClient::reportStatus(const char *status) {
     {
         Lock lock(mutex_);
         currentStatus_ = status;
-        enqueueLocked(false, currentStatus_, false);
+        enqueueLocked(Kind::kStatus, currentStatus_, false);
     }
-    if (task_) xTaskNotifyGive(task_);
+    wake();
 }
 
 void ScadaClient::reportAlarm(const char *message, bool active) {
@@ -57,24 +62,47 @@ void ScadaClient::reportAlarm(const char *message, bool active) {
         while (it != activeAlarms_.end() && *it != text) ++it;
         if (active && it == activeAlarms_.end()) activeAlarms_.push_back(text);
         if (!active && it != activeAlarms_.end()) activeAlarms_.erase(it);
-        enqueueLocked(true, text, active);
+        enqueueLocked(Kind::kAlarm, text, active);
     }
-    if (task_) xTaskNotifyGive(task_);
+    wake();
+}
+
+void ScadaClient::reportSortingResult(const SortingResult &result) {
+    // Serialised now, so the queue holds one string per event.
+    JsonDocument doc;
+    doc["reading_result"] = result.readingResult;
+    doc["origin"] = result.origin;
+    doc["destination"] = result.destination;
+    doc["part_id"] = result.partId;
+    doc["repository"] = result.repository;
+    doc["sorting_result"] = result.sortingResult;
+    String body;
+    serializeJson(doc, body);
+    {
+        Lock lock(mutex_);
+        enqueueLocked(Kind::kResult, body, false);
+    }
+    wake();
 }
 
 bool ScadaClient::send(const Event &e) {
-    JsonDocument doc;
     const char *path;
-    if (e.isAlarm) {
-        path = alarmPath_;
-        doc["alarm_message"] = e.text;
-        doc["alarm_status"] = e.active;
-    } else {
-        path = statusPath_;
-        doc["status"] = e.text;
-    }
     String body;
-    serializeJson(doc, body);
+    if (e.kind == Kind::kResult) {
+        path = resultPath_;
+        body = e.text;
+    } else {
+        JsonDocument doc;
+        if (e.kind == Kind::kAlarm) {
+            path = alarmPath_;
+            doc["alarm_message"] = e.text;
+            doc["alarm_status"] = e.active;
+        } else {
+            path = statusPath_;
+            doc["status"] = e.text;
+        }
+        serializeJson(doc, body);
+    }
 
     HTTPClient http;
     http.setConnectTimeout(kConnectTimeoutMs);
@@ -124,8 +152,8 @@ void ScadaClient::taskLoop() {
         if (wasOffline) {
             // Back online: resend the current state after what is queued.
             wasOffline = false;
-            if (currentStatus_.length()) enqueueLocked(false, currentStatus_, false);
-            for (const String &alarm : activeAlarms_) enqueueLocked(true, alarm, true);
+            if (currentStatus_.length()) enqueueLocked(Kind::kStatus, currentStatus_, false);
+            for (const String &alarm : activeAlarms_) enqueueLocked(Kind::kAlarm, alarm, true);
         }
     }
 }

@@ -126,7 +126,8 @@ class SerialManager {
 // Stand-in for a board, used when the page is opened with ?demo, so the
 // panel can be tried without hardware. It answers the same commands.
 class DemoSerial {
-    constructor() {
+    // app: 'arm4dof' (default) or 'sorting' (open the page with ?demo=sorting).
+    constructor(app = 'arm4dof') {
         this.isConnected = false;
         this.onConnect = this.onDisconnect = this.onLine = this.onTx = this.onError = null;
         this.s = {
@@ -135,12 +136,21 @@ class DemoSerial {
             limits: [[-90, 90], [25, 110], [5, 50], [-90, 90]],
             x: 186.2, y: 0, z: 46.7,
             wifi: { connected: true, ssid: 'demo-wifi', ip: '192.168.1.50', rssi: -52, gwhost: '192.168.1.10', gwport: 8080,
-                    stpath: '/scada/report-current-status', alpath: '/scada/report-alarm' },
+                    stpath: '/scada/report-current-status', alpath: '/scada/report-alarm',
+                    srpath: '/scada/report-sorting-result' },
             cfg: { ssid: 'demo-wifi', pass_set: true, gwhost: '192.168.1.10', gwport: 8080,
-                   stpath: '/scada/report-current-status', alpath: '/scada/report-alarm', pending: false },
+                   stpath: '/scada/report-current-status', alpath: '/scada/report-alarm',
+                   srpath: '/scada/report-sorting-result', pending: false },
             distance: 183, alarm: false,
             joystick: { raw_x: 2048, raw_y: 2048, centre_x: 2048, centre_y: 2048, x: 0, y: 0, sw: false }
         };
+        if (app === 'sorting') {
+            // The sorting build has no obstacle sensor and no joystick.
+            this.s.app = 'sorting';
+            delete this.s.distance; delete this.s.alarm; delete this.s.joystick;
+            this.s.conveyor_moving = false;
+            this.s.position_config = { valid: false, repositories: 0, destinations: 0 };
+        }
     }
     isSupported() { return true; }
     async connect() { this.isConnected = true; if (this.onConnect) this.onConnect(); return true; }
@@ -159,16 +169,20 @@ class DemoSerial {
         const up = cmd.toUpperCase();
         const s = this.s;
         if (up === 'INFO') {
-            s.distance = 150 + Math.round(40 * Math.sin(Date.now() / 1500));
-            // A stick slowly moved in a circle.
-            const t = Date.now() / 2000;
-            const j = s.joystick;
-            j.x = +(0.8 * Math.cos(t)).toFixed(2);
-            j.y = +(0.8 * Math.sin(t)).toFixed(2);
-            j.raw_x = Math.round(2048 + 2047 * j.x);
-            j.raw_y = Math.round(2048 + 2047 * j.y);
-            j.sw = Math.floor(t) % 4 === 0;
+            if (s.joystick) {
+                s.distance = 150 + Math.round(40 * Math.sin(Date.now() / 1500));
+                // A stick slowly moved in a circle.
+                const t = Date.now() / 2000;
+                const j = s.joystick;
+                j.x = +(0.8 * Math.cos(t)).toFixed(2);
+                j.y = +(0.8 * Math.sin(t)).toFixed(2);
+                j.raw_x = Math.round(2048 + 2047 * j.x);
+                j.raw_y = Math.round(2048 + 2047 * j.y);
+                j.sw = Math.floor(t) % 4 === 0;
+            }
             reply('#INFO:' + JSON.stringify(s));
+        } else if (up === 'SRTEST' && s.app === 'sorting') {
+            reply(`#SR:OK test sorting result queued for ${s.wifi.srpath}`);
         } else if (up.startsWith('PERMIT ')) {
             s.permit = up.endsWith('1');
             s.status = s.permit ? 'idle' : 'stop';
@@ -196,11 +210,12 @@ class DemoSerial {
             if (key === 'GWPORT') s.cfg.gwport = +m[2];
             if (key === 'STPATH') s.cfg.stpath = m[2] || '/scada/report-current-status';
             if (key === 'ALPATH') s.cfg.alpath = m[2] || '/scada/report-alarm';
+            if (key === 'SRPATH') s.cfg.srpath = m[2] || '/scada/report-sorting-result';
             s.cfg.pending = true;
             reply(`#CFG:OK ${key} stored, REBOOT to apply`);
         } else if (up === 'REBOOT') {
             s.wifi.ssid = s.cfg.ssid; s.wifi.gwhost = s.cfg.gwhost; s.wifi.gwport = s.cfg.gwport;
-            s.wifi.stpath = s.cfg.stpath; s.wifi.alpath = s.cfg.alpath;
+            s.wifi.stpath = s.cfg.stpath; s.wifi.alpath = s.cfg.alpath; s.wifi.srpath = s.cfg.srpath;
             s.cfg.pending = false; s.permit = false; s.status = 'stop';
             reply('#CFG:OK rebooting');
         } else {

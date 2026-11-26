@@ -7,25 +7,12 @@ using namespace arm;
 
 namespace {
 
-const size_t kMaxBodyBytes = 1024;
+// Large enough for a position config (4.1) with a few dozen destinations.
+const size_t kMaxBodyBytes = 4096;
 
 // One decimal is plenty for mm and degrees, and keeps float noise such as
 // 149.99998 out of the JSON.
 double round1(float v) { return round((double)v * 10.0) / 10.0; }
-
-void sendJson(AsyncWebServerRequest *request, int code, const JsonDocument &doc) {
-    String body;
-    serializeJson(doc, body);
-    Serial.printf("[%lu] HTTP -> %s %d %s\n", millis(), request->url().c_str(), code,
-                  body.c_str());
-    request->send(code, "application/json", body);
-}
-
-void sendError(AsyncWebServerRequest *request, int code, const char *message) {
-    JsonDocument doc;
-    doc["error"] = message;
-    sendJson(request, code, doc);
-}
 
 // Collects the request body into request->_tempObject (freed by the server
 // when the request is destroyed).
@@ -41,6 +28,20 @@ void collectBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size
 }
 
 }  // namespace
+
+void ControllerApi::sendJson(AsyncWebServerRequest *request, int code, const JsonDocument &doc) {
+    String body;
+    serializeJson(doc, body);
+    Serial.printf("[%lu] HTTP -> %s %d %s\n", millis(), request->url().c_str(), code,
+                  body.c_str());
+    request->send(code, "application/json", body);
+}
+
+void ControllerApi::sendError(AsyncWebServerRequest *request, int code, const char *message) {
+    JsonDocument doc;
+    doc["error"] = message;
+    sendJson(request, code, doc);
+}
 
 void wifiBegin(const NetworkConfig &net) {
     WiFi.persistent(false);
@@ -100,7 +101,7 @@ void ControllerApi::deferOperationResult(
     const std::function<OpResult(ArmMachine::DoneFn)> &start) {
     AsyncWebServerRequestPtr paused = request->pause();
 
-    const OpResult r = start([this, paused, name](OpResult result) {
+    const OpResult r = start([paused, name](OpResult result) {
         if (auto req = paused.lock()) {
             sendOperationResult(req.get(), result);
         } else {

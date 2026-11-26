@@ -13,6 +13,7 @@ ArmDriver *g_driver = nullptr;
 ArmMachine *g_machine = nullptr;
 const char *g_appName = "";
 hmi::InfoExtraFn g_extra;
+hmi::CommandFn g_commands;
 
 double round1(float v) { return round((double)v * 10.0) / 10.0; }
 
@@ -55,6 +56,7 @@ void printInfo(Stream &io) {
     wifi["gwport"] = settings::active().scadaPort;
     wifi["stpath"] = settings::active().scadaStatusPath;
     wifi["alpath"] = settings::active().scadaAlarmPath;
+    wifi["srpath"] = settings::active().scadaResultPath;
 
     // Stored values = what the next boot will use. The password itself is
     // never printed.
@@ -67,12 +69,14 @@ void printInfo(Stream &io) {
     cfgOut["gwport"] = stored.scadaPort;
     cfgOut["stpath"] = stored.scadaStatusPath;
     cfgOut["alpath"] = stored.scadaAlarmPath;
+    cfgOut["srpath"] = stored.scadaResultPath;
     cfgOut["pending"] = stored.wifiSsid != active.wifiSsid ||
                         stored.wifiPassword != active.wifiPassword ||
                         stored.scadaHost != active.scadaHost ||
                         stored.scadaPort != active.scadaPort ||
                         stored.scadaStatusPath != active.scadaStatusPath ||
-                        stored.scadaAlarmPath != active.scadaAlarmPath;
+                        stored.scadaAlarmPath != active.scadaAlarmPath ||
+                        stored.scadaResultPath != active.scadaResultPath;
 
     if (g_extra) g_extra(info);
 
@@ -146,7 +150,7 @@ bool handle(char *line, Stream &io) {
         ESP.restart();
         return true;
     }
-    return false;
+    return g_commands && g_commands(line, io);
 }
 
 }  // namespace
@@ -154,11 +158,12 @@ bool handle(char *line, Stream &io) {
 namespace hmi {
 
 void begin(SerialConsole &console, ArmDriver &driver, ArmMachine &machine,
-           const char *appName, InfoExtraFn extra) {
+           const char *appName, InfoExtraFn extra, CommandFn commands) {
     g_driver = &driver;
     g_machine = &machine;
     g_appName = appName;
     g_extra = std::move(extra);
+    g_commands = std::move(commands);
     console.setExtension(handle);
 }
 

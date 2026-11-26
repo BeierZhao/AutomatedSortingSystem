@@ -6,7 +6,7 @@ One PlatformIO project for both projects described in
 | Environment | What it builds |
 | --- | --- |
 | `arm4dof` | 4-DOF arm: shared arm controller, ultrasonic obstacle stop, joystick manual mode |
-| `sorting` | Automated Sorting System. **Stub**: only the shared arm controller so far |
+| `sorting` | Automated Sorting System. **Partial**: shared arm controller, conveyor (4.4), position config (4.1), sorting result report (2.3). No vision client or sequence yet |
 | `native` | PC unit tests for the kinematics and the joint interpolator |
 
 ## Build and test
@@ -31,12 +31,13 @@ then add `%USERPROFILE%\.platformio\packages\toolchain-gccmingw32\bin` to the PA
 | --- | --- |
 | Wi-Fi name and password, gateway address | At run time with the serial panel (below), stored in the ESP32's flash. `include/NetConfig.h` holds the defaults used until something is stored |
 | Static IP, HTTP port, and the defaults above | `include/NetConfig.h`. Copy it from `include/NetConfig.example.h`. It is git-ignored |
-| Pins | `include/BoardPins.h` |
+| Pins (servos, joystick, ultrasonic, conveyor STEP/DIR/EN) | `include/BoardPins.h` |
 | Link lengths, joint limits, servo mapping, speeds, home pose | `lib/ArmKinematics/ArmConfig.h` |
 | Tool TCP offsets | `lib/ToolHead/ToolHead.h` |
 | Obstacle thresholds, joystick | `src/arm4dof/Arm4dofConfig.h` |
+| Conveyor steps per mm, speed, direction, largest distance | `src/sorting/SortingConfig.h` |
 
-Not measured yet, still at the proposed defaults: wrist servo direction, offset and limits, tool offsets, obstacle thresholds, joint speeds.
+Not measured yet, still at the proposed defaults: wrist servo direction, offset and limits, tool offsets, obstacle thresholds, joint speeds, conveyor steps per mm and speed.
 
 ## Status
 
@@ -51,7 +52,10 @@ Everything below has been verified **by build and PC unit tests only**. Nothing 
 | Wi-Fi and `/controller/...` endpoints 4.2, 4.3, 4.5, 4.6, 4.7 | Written, builds |
 | `/scada/report-current-status`, `/scada/report-alarm` queue | Written, builds |
 | arm4dof: obstacle monitor, joystick, endpoint 4.8 | Written, builds |
-| sorting: gripper, conveyor (4.4), vision client, position config (4.1), sequence, result report (2.3) | Not started |
+| sorting: conveyor (4.4) on a step/dir driver, endpoint `/controller/move-conveyor` | Written, builds |
+| sorting: position config (4.1) in flash, endpoint `/controller/update-position-config` | Written, builds |
+| sorting: `/scada/report-sorting-result` (2.3) in the report queue, `SRTEST` test command | Written, builds. Nothing sends real results until the sequence exists |
+| sorting: gripper, vision client, sequence | Not started |
 
 ## Serial console
 
@@ -94,13 +98,16 @@ Plug the board in through its UART USB port and close any other serial monitor f
 | `INFO` | One line `#INFO:{json}` with the live state. The panel polls it twice a second |
 | `J <joint> <angle>` | Jog joint 1 to 4 to a physical angle |
 | `SET SSID\|PASS\|GWHOST\|GWPORT <value>` | Store a network setting. The value is the rest of the line |
-| `SET STPATH\|ALPATH <path>` | Store the path of the status (2.1) or alarm (2.2) report on the SCADA receiver, for example `/system/webdev/SortingDemo/report_status`. Starts with `/`, at most 100 characters, no spaces. Without a path, the stored one is forgotten and the `NetConfig.h` default is used |
+| `SET STPATH\|ALPATH\|SRPATH <path>` | Store the path of the status (2.1), alarm (2.2) or sorting result (2.3) report on the SCADA receiver, for example `/system/webdev/SortingDemo/report_status`. Starts with `/`, at most 100 characters, no spaces. Without a path, the stored one is forgotten and the `NetConfig.h` default is used. `SRPATH` is used by the sorting build only |
+| `SRTEST` | Sorting build only: queue one sorting result report with fixed example values (part `10234`, `Repo3`) to check the receiver and the path in use |
 | `FACTORY` | Forget the stored settings, back to `NetConfig.h` |
 | `REBOOT` | Restart, which applies stored settings |
 
 The Wi-Fi password is stored in the ESP32's flash unencrypted and is never printed back.
 
-The **SCADA endpoints** card sets the report paths, so the board can report to a different receiver (the Python gateway, an Ignition WebDev project, ...) without a rebuild. It shows the full URLs built from the gateway host and port of the Network card. **Default** forgets the stored paths. Like the other settings, they are used from the next boot.
+The **SCADA endpoints** card sets the report paths, so the board can report to a different receiver (the Python gateway, an Ignition WebDev project, ...) without a rebuild. It shows the full URLs built from the gateway host and port of the Network card. **Default** forgets the stored paths. Like the other settings, they are used from the next boot. With the sorting build the card also has the **sorting result path** and a **Send test result** button (`SRTEST`). The test report is recorded by the receiver like a real part. Reports are retried until the receiver accepts them, so a wrong path holds up the later reports until the path is fixed and the board rebooted.
+
+`python tools/serial_hmi/run_hmi.py --demo sorting` shows the panel as for the sorting build.
 
 ## HTTP panel
 
@@ -120,7 +127,7 @@ python tools/http_hmi/run_http_hmi.py --esp32 http://192.168.1.50   (or double-c
 | `--host` | `0.0.0.0` | Listen address. Must be reachable from the ESP32 |
 | `--no-browser`, `--verbose` | | Do not open the browser; log every HTTP request |
 
-At start it prints this PC's IP addresses. Set the board's gateway host to one of them, the gateway port to `--port` and the report paths to `/scada/report-current-status` and `/scada/report-alarm` (with the serial panel, or `NET_SCADA_HOST` / `NET_SCADA_PORT` / `NET_SCADA_STATUS_PATH` / `NET_SCADA_ALARM_PATH`), and allow the port through the Windows firewall (see `ignition_bridge/README.md`). Motion commands wait up to 30 s for the answer; send a second one while the first runs to see `rejected`.
+At start it prints this PC's IP addresses. Set the board's gateway host to one of them, the gateway port to `--port` and the report paths to `/scada/report-current-status`, `/scada/report-alarm` and (sorting build) `/scada/report-sorting-result` (with the serial panel, or `NET_SCADA_HOST` / `NET_SCADA_PORT` / `NET_SCADA_STATUS_PATH` / `NET_SCADA_ALARM_PATH` / `NET_SCADA_RESULT_PATH`), and allow the port through the Windows firewall (see `ignition_bridge/README.md`). Motion commands wait up to 30 s for the answer; send a second one while the first runs to see `rejected`.
 
 Without a board, run it against the gateway's stub ESP32:
 
@@ -148,6 +155,10 @@ Raise these for team review.
 11. The servo pulse range is 544 to 2400 microseconds for 0 to 180 degrees, the Arduino Nano `Servo` default that the ArmTest calibration was done with.
 12. The obstacle distance is the median of five readings at 20 Hz, so the alarm reacts after about 150 ms.
 13. The joystick centre is read at power-up, so the stick must be released then.
+14. Sorting: only one motion command runs at a time across the arm and the conveyor. `move-conveyor` follows the rules of 4.2 and 4.3: `"rejected"` without the running permit or while any motion runs, and a running move is stopped and answered `"rejected"` by `set-running-permit` `false` or the serial `STOP`.
+15. `move-conveyor`: `direction` `true` drives the DIR pin to `kConveyorDirLevelForTrue` (`SortingConfig.h`), to be defined as the feed direction when the conveyor is built. A `distance` below 0 or above 5000 mm is answered with HTTP 400, because 4.4 has no `"invalid"` result. A distance of 0 is `"success"` without moving. The belt runs at a constant speed without a ramp. A manual `move-conveyor` does not change the reported status.
+16. `update-position-config`: malformed JSON is HTTP 400. A body that is valid JSON but incomplete or inconsistent is answered `{"operation_done": false}` and the reason is printed on the serial log: `repositories` needs 1 to 16 entries named `Repo<N>` with numeric `x`, `y`, `z`; `destinations` (may be empty, up to 64) must map each name to one of those repositories; `part_dock` needs numeric `x`, `y`, `z`. Reachability by the arm is not checked. On `false` the previous config stays in use. The config is kept in flash and loaded at boot. Destination names are case-sensitive and must match the OCR text.
+17. `report-sorting-result` reports are never dropped from the queue and are retried until accepted, but they are not sent again after a reconnect (they are events, not states), so a result can reach the receiver twice only if its first answer was lost.
 
 ## Trying it without the gateway
 
@@ -157,4 +168,11 @@ curl -X POST http://<esp32-ip>/controller/set-arm-position -H "Content-Type: app
 curl -X POST http://<esp32-ip>/controller/get-current-joint-position -d "{}"
 ```
 
-The status and alarm reports go to `http://<gateway host>:<gateway port><path>`, set with the serial panel (defaults: `NET_SCADA_HOST`, `NET_SCADA_PORT`, `NET_SCADA_STATUS_PATH`, `NET_SCADA_ALARM_PATH`). Without the gateway, the HTTP panel above receives and shows them.
+Sorting build:
+
+```
+curl -X POST http://<esp32-ip>/controller/move-conveyor -H "Content-Type: application/json" -d "{\"direction\":true,\"distance\":100}"
+curl -X POST http://<esp32-ip>/controller/update-position-config -H "Content-Type: application/json" -d "{\"repositories\":{\"Repo1\":{\"x\":50,\"y\":50,\"z\":0}},\"destinations\":{\"Hamilton\":\"Repo1\"},\"part_dock\":{\"x\":10,\"y\":10,\"z\":10}}"
+```
+
+The status, alarm and sorting result reports go to `http://<gateway host>:<gateway port><path>`, set with the serial panel (defaults: `NET_SCADA_HOST`, `NET_SCADA_PORT`, `NET_SCADA_STATUS_PATH`, `NET_SCADA_ALARM_PATH`, `NET_SCADA_RESULT_PATH`). Without the gateway, the HTTP panel above receives and shows them.

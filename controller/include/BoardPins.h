@@ -28,4 +28,10 @@ const int kJoystickSw = 42;      // internal pull-up, active low
 const int kUltrasonicTrig = 15;
 const int kUltrasonicEcho = 16;  // through a 5 V -> 3.3 V divider
 
+// Sorting system only: conveyor stepper driver (STEP/DIR/EN, for example
+// A4988, DRV8825 or TMC2208 in step/dir mode). Not checked on hardware.
+const int kConveyorStep = 4;
+const int kConveyorDir = 5;
+const int kConveyorEnable = 6;   // active low. -1 if the driver has no EN
+
 }  // namespace pins

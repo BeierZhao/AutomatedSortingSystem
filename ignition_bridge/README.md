@@ -61,7 +61,7 @@ Then edit `config.toml` (it is git-ignored):
 | `[logging] level`, `file` | `INFO`, none | Log level, and an optional rotating log file |
 | `[alarms]` | `"Obstacle detected" = "Alarms/Obstacle"` | Alarm table, see below |
 
-On the ESP32 side, the firmware must push its reports to this machine: set `NET_SCADA_HOST` to this machine's IP address and `NET_SCADA_PORT` to the `[http] port` (in `controller/include/NetConfig.h`, or with the serial HMI panel). Give this machine and the ESP32 fixed addresses.
+On the ESP32 side, the firmware must push its reports to this machine: set `NET_SCADA_HOST` to this machine's IP address and `NET_SCADA_PORT` to the `[http] port` (in `controller/include/NetConfig.h`, or with the serial HMI panel). The report paths must be the gateway's: `/scada/report-current-status`, `/scada/report-alarm` and, for the `sorting` profile, `/scada/report-sorting-result` (`NET_SCADA_*_PATH`, or the SCADA endpoints card of the serial panel). Give this machine and the ESP32 fixed addresses.
 
 ### Alarm table
 

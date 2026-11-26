@@ -38,19 +38,32 @@ public:
 
     // Registers the endpoints shared by both projects (4.2, 4.3, 4.5, 4.6,
     // 4.7) and starts the server. Call after wifiBegin() and after any
-    // addReadEndpoint().
+    // addReadEndpoint() or addEndpoint().
     void begin();
 
     // Adds a project-specific endpoint that takes {} and answers at once,
     // for example /controller/get-obstacle-distance.
     void addReadEndpoint(const char *path, ReadFn fn);
 
-private:
+    // Adds a project-specific POST endpoint. The handler runs once the
+    // whole body has arrived and parsed as a JSON object (an empty body
+    // counts as {}), and must answer with one of the helpers below.
     using JsonHandler = std::function<void(AsyncWebServerRequest *, JsonObjectConst body)>;
-    void post(const char *path, JsonHandler handler);
-    void sendOperationResult(AsyncWebServerRequest *request, OpResult r);
+    void addEndpoint(const char *path, JsonHandler handler) { post(path, std::move(handler)); }
+
+    // ---- Helpers for project-specific endpoints ----
+    static void sendJson(AsyncWebServerRequest *request, int code, const JsonDocument &doc);
+    // HTTP `code` with {"error": message}.
+    static void sendError(AsyncWebServerRequest *request, int code, const char *message);
+    // Runs a motion command and answers {"operation_result": ...} when its
+    // result is known: at once unless `start` returns kPending, otherwise
+    // when `start`'s done callback runs.
     void deferOperationResult(AsyncWebServerRequest *request, const char *name,
                               const std::function<OpResult(ArmMachine::DoneFn)> &start);
+
+private:
+    void post(const char *path, JsonHandler handler);
+    static void sendOperationResult(AsyncWebServerRequest *request, OpResult r);
 
     ArmMachine &machine_;
     AsyncWebServer server_;

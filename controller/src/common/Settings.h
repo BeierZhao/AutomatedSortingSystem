@@ -12,10 +12,11 @@ struct DeviceSettings {
     String wifiPassword;
     String scadaHost;
     uint16_t scadaPort;
-    // Paths on the SCADA receiver for the status (2.1) and alarm (2.2)
-    // reports, for example "/scada/report-current-status".
+    // Paths on the SCADA receiver for the status (2.1), alarm (2.2) and
+    // sorting result (2.3) reports, for example "/scada/report-current-status".
     String scadaStatusPath;
     String scadaAlarmPath;
+    String scadaResultPath;
 };
 
 namespace settings {
@@ -29,9 +30,9 @@ const DeviceSettings &active();
 // What is stored now, which is what the next boot will use.
 DeviceSettings stored();
 
-// Stores one value. Keys: SSID, PASS, GWHOST, GWPORT, STPATH, ALPATH
-// (case-insensitive). An empty STPATH or ALPATH forgets the stored path, so
-// the NetConfig.h default is used again. Returns nullptr on success, or an
+// Stores one value. Keys: SSID, PASS, GWHOST, GWPORT, STPATH, ALPATH,
+// SRPATH (case-insensitive). An empty STPATH, ALPATH or SRPATH forgets the
+// stored path, so the NetConfig.h default is used again. Returns nullptr on success, or an
 // error text.
 const char *set(const char *key, const char *value);
 

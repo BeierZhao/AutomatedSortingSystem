@@ -37,11 +37,20 @@ bool ArmMachine::movesTcp(const JointAngles &from, const JointAngles &to) const 
     return false;
 }
 
+bool ArmMachine::commandRunning() {
+    return driver_.commandPending() || (aux_ && aux_->busy());
+}
+
+void ArmMachine::stopAll() {
+    driver_.stop();
+    if (aux_) aux_->stop();
+}
+
 // ---------------- Remote commands ----------------
 
 OpResult ArmMachine::setArmPosition(float x, float y, float z, DoneFn done) {
     Lock lock(mutex_);
-    if (manual_ || !permit_ || tcpBlocked_ || driver_.commandPending()) {
+    if (manual_ || !permit_ || tcpBlocked_ || commandRunning()) {
         return OpResult::kRejected;
     }
 
@@ -76,7 +85,7 @@ OpResult ArmMachine::setArmPosition(float x, float y, float z, DoneFn done) {
 
 OpResult ArmMachine::setJointPosition(int jointNumber, float angle, DoneFn done) {
     Lock lock(mutex_);
-    if (manual_ || !permit_ || driver_.commandPending()) return OpResult::kRejected;
+    if (manual_ || !permit_ || commandRunning()) return OpResult::kRejected;
 
     const int joint = jointNumber - 1;
     // Assumption: a joint number that does not exist is "invalid".
@@ -99,9 +108,15 @@ void ArmMachine::setRunningPermit(bool permit) {
     if (permit) {
         setStatus(status_text::kIdle);
     } else {
-        driver_.stop();  // a running command is answered "rejected"
+        stopAll();  // a running command is answered "rejected"
         setStatus(status_text::kStop);
     }
+}
+
+OpResult ArmMachine::startAux(const std::function<bool()> &start) {
+    Lock lock(mutex_);
+    if (!aux_ || manual_ || !permit_ || commandRunning()) return OpResult::kRejected;
+    return start() ? OpResult::kPending : OpResult::kRejected;
 }
 
 // ---------------- Read-back ----------------
@@ -134,7 +149,7 @@ bool ArmMachine::tcpBlocked() {
 
 void ArmMachine::toggleManual() {
     Lock lock(mutex_);
-    driver_.stop();
+    stopAll();
     if (!manual_) {
         manual_ = true;
         setStatus(status_text::kManual);
@@ -154,7 +169,7 @@ bool ArmMachine::manualStreamTo(const JointAngles &target) {
 
 void ArmMachine::obstacleStop() {
     Lock lock(mutex_);
-    driver_.stop();
+    stopAll();
     if (manual_) return;  // status stays "manual"
     permit_ = false;
     setStatus(status_text::kStop, true);
@@ -170,12 +185,12 @@ void ArmMachine::setTcpBlocked(bool blocked) {
 OpResult ArmMachine::consoleJogTo(const JointAngles &target) {
     Lock lock(mutex_);
     if (checkJoints(cfg_, target) != kIkOk) return OpResult::kInvalid;
-    if (manual_ || driver_.commandPending()) return OpResult::kRejected;
+    if (manual_ || commandRunning()) return OpResult::kRejected;
     if (tcpBlocked_ && movesTcp(driver_.current(), target)) return OpResult::kRejected;
     return driver_.streamTo(target) ? OpResult::kSuccess : OpResult::kRejected;
 }
 
 void ArmMachine::consoleStop() {
     Lock lock(mutex_);
-    driver_.stop();
+    stopAll();
 }

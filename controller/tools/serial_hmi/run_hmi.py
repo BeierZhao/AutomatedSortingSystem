@@ -5,6 +5,7 @@ one, so the page cannot simply be opened as a file.
 
     python run_hmi.py          panel for a real board
     python run_hmi.py --demo   panel with simulated data, no board needed
+    python run_hmi.py --demo sorting   the same for the sorting build
 """
 import http.server
 import os
@@ -31,7 +32,8 @@ def main():
     port = find_available_port(DEFAULT_PORT)
     url = f"http://localhost:{port}/index.html"
     if "--demo" in sys.argv:
-        url += "?demo"
+        i = sys.argv.index("--demo")
+        url += "?demo=sorting" if sys.argv[i + 1:i + 2] == ["sorting"] else "?demo"
 
     print("=" * 60)
     print(" Arm Controller Serial Panel")
