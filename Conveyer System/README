@@ -1,0 +1,17 @@
+Wiring (D1 R32):
+
+    ULN2003 IN1, IN2, IN3, IN4 go to GPIO 25, 26, 27 and 14.
+
+    KY-032 S goes to GPIO 16 (D5), with its power from 3V3.
+
+    Motor + goes to 5V.
+
+Serial commands (115200 baud, newline-terminated):
+
+    The belt runs until the sensor sees a box, then stops and prints BOX.
+
+    GO moves about 40 mm to clear the sensor and resumes.
+
+    GO <mm> moves that distance, prints DONE, and waits.
+
+    RUN resumes the belt, and STOP halts it.

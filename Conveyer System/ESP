@@ -1,0 +1,123 @@
+// Conveyor: 28BYJ-48 + ULN2003 + KY-032 on Wemos D1 R32 (ESP32)
+// Belt runs until a box is detected, stops, reports "BOX", then waits for a command.
+// Serial commands (115200 baud, newline-terminated):
+//   GO        -> move CLEAR_MM then resume looking for the next box
+//   GO <mm>   -> move <mm> (e.g. to a bin), print DONE, then resume
+//   STOP      -> stop belt and wait
+//   RUN       -> resume belt
+
+const int P[4] = {25, 26, 27, 14};     // IN1, IN2, IN3, IN4 (GPIO)
+const int SENSOR_PIN = 16;             // KY-032 S pin (D5), active LOW
+
+const unsigned long STEP_US = 1500;     // confirmed working; use 1000 for more torque margin
+const unsigned long DEBOUNCE_MS = 30;
+
+const float ROLLER_DIAMETER_MM = 31.0;
+const float STEPS_PER_REV = 4096.0;
+const float STEPS_PER_MM = STEPS_PER_REV / (3.14159265 * ROLLER_DIAMETER_MM);
+const float CLEAR_MM = 40.0;           // default move after releasing a box
+
+const int seq[8][4] = {
+  {1,0,0,0},{1,1,0,0},{0,1,0,0},{0,1,1,0},
+  {0,0,1,0},{0,0,1,1},{0,0,0,1},{1,0,0,1}
+};
+
+enum State { RUNNING, WAITING, MOVING };
+State state = RUNNING;
+
+int idx = 0;
+unsigned long lastStepUs = 0;
+long stepsRemaining = 0;
+bool reportDone = false;
+
+bool armed = true;                     // must see "clear" before the next detection
+bool lastRaw = false;
+bool stable = false;
+unsigned long lastChangeMs = 0;
+
+String line;
+
+void coilsOff() { for (int i = 0; i < 4; i++) digitalWrite(P[i], LOW); }
+
+void stepOnce() {
+  idx = (idx + 1) % 8;
+  for (int i = 0; i < 4; i++) digitalWrite(P[i], seq[idx][i]);
+}
+
+bool boxPresent() {                    // debounced; true = box in front of sensor
+  bool raw = (digitalRead(SENSOR_PIN) == LOW);
+  if (raw != lastRaw) { lastRaw = raw; lastChangeMs = millis(); }
+  if (millis() - lastChangeMs >= DEBOUNCE_MS) stable = raw;
+  return stable;
+}
+
+void startMove(float mm, bool announce) {
+  stepsRemaining = (long)(mm * STEPS_PER_MM);
+  reportDone = announce;
+  state = MOVING;
+}
+
+void handleCommand(String cmd) {
+  cmd.trim();
+  cmd.toUpperCase();
+  if (cmd == "GO") {
+    startMove(CLEAR_MM, false);
+  } else if (cmd.startsWith("GO ")) {
+    float mm = cmd.substring(3).toFloat();
+    if (mm > 0) startMove(mm, true);
+    else Serial.println("ERR bad distance");
+  } else if (cmd == "STOP") {
+    state = WAITING; coilsOff(); Serial.println("STOPPED");
+  } else if (cmd == "RUN") {
+    state = RUNNING;
+  } else {
+    Serial.println("ERR unknown command");
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  for (int i = 0; i < 4; i++) pinMode(P[i], OUTPUT);
+  pinMode(SENSOR_PIN, INPUT_PULLUP);
+  coilsOff();
+  Serial.println("READY");
+}
+
+void loop() {
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n') { handleCommand(line); line = ""; }
+    else if (c != '\r') line += c;
+  }
+
+  bool present = boxPresent();
+  if (!present) armed = true;
+
+  switch (state) {
+    case RUNNING:
+      if (present && armed) {
+        armed = false;
+        state = WAITING;
+        coilsOff();
+        Serial.println("BOX");
+        break;
+      }
+      if (micros() - lastStepUs >= STEP_US) { lastStepUs = micros(); stepOnce(); }
+      break;
+
+    case MOVING:
+      if (micros() - lastStepUs >= STEP_US) {
+        lastStepUs = micros();
+        stepOnce();
+        if (--stepsRemaining <= 0) {
+          coilsOff();
+          if (reportDone) Serial.println("DONE");
+          state = reportDone ? WAITING : RUNNING;
+        }
+      }
+      break;
+
+    case WAITING:
+      break;
+  }
+}
